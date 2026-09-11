@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyZen - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>🌱 StudyZen</h2>
+                <button class="menu-toggle" id="menu-toggle">☰</button>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('dashboard') }}" class="nav-link active">
+                    <span class="icon">🏠</span> Dashboard
+                </a>
+                <a href="#tasks" class="nav-link">
+                    <span class="icon">✅</span> Tasks
+                </a>
+                <a href="#subjects" class="nav-link">
+                    <span class="icon">📚</span> Subjects
+                </a>
+                <a href="#focus" class="nav-link">
+                    <span class="icon">⏱️</span> Focus Timer
+                </a>
+                <a href="#planner" class="nav-link">
+                    <span class="icon">📅</span> Planner
+                </a>
+                <a href="#notes" class="nav-link">
+                    <span class="icon">📝</span> Notes
+                </a>
+                <a href="#statistics" class="nav-link">
+                    <span class="icon">📊</span> Statistics
+                </a>
+                <a href="{{ url_for('profile') }}" class="nav-link">
+                    <span class="icon">👤</span> Profile
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-content">
+                    <h1 id="greeting">Good morning! 🌱</h1>
+                    <p id="date-display" class="date-display"></p>
+                </div>
+                <div class="user-profile">
+                    <span id="user-name">{{ user.name }}</span>
+                </div>
+            </header>
+
+            <!-- Quick Stats -->
+            <section class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Today's Study Time</p>
+                        <p class="stat-value" id="today-study-time">0h 0m</p>
+                    </div>
+                    <div class="stat-goal">
+                        <p class="goal-text" id="goal-text">Goal: 120m</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="study-progress"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">🔥</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Study Streak</p>
+                        <p class="stat-value" id="streak-count">0</p>
+                    </div>
+                    <p class="streak-text" id="streak-text">Keep it up!</p>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-content">
+                        <p class="stat-label">Tasks Completed</p>
+                        <p class="stat-value" id="tasks-completed">0</p>
+                    </div>
+                    <p class="task-text" id="task-text">Out of 0 tasks</p>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-content">
+                        <p class="stat-label">My Groups</p>
+                        <p class="stat-value" id="group-count">0</p>
+                    </div>
+                    <a href="{{ url_for('community') }}" class="card-link">Browse Groups</a>
+                </div>
+            </section>
+
+            <!-- Quick Actions -->
+            <section class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="openAddTask()">
+                        <span>➕</span> Add Task
+                    </button>
+                    <button class="action-btn" onclick="openAddSubject()">
+                        <span>📚</span> Add Subject
+                    </button>
+                    <button class="action-btn" onclick="openFocusTimer()">
+                        <span>⏱️</span> Start Focus
+                    </button>
+                    <button class="action-btn" onclick="openAddNote()">
+                        <span>📝</span> Add Notes
+                    </button>
+                    <button class="action-btn" onclick="openSchedule()">
+                        <span>📅</span> View Schedule
+                    </button>
+                    <button class="action-btn" onclick="window.location.href='{{ url_for('community') }}'">
+                        <span>👥</span> Browse Groups
+                    </button>
+                </div>
+            </section>
+
+            <!-- Upcoming Tasks & Exams -->
+            <section class="upcoming-section">
+                <div class="upcoming-col">
+                    <h2>📅 Upcoming Tasks</h2>
+                    <div class="upcoming-list" id="upcoming-tasks">
+                        <p class="empty-state">No upcoming tasks</p>
+                    </div>
+                </div>
+
+                <div class="upcoming-col">
+                    <h2>📚 Upcoming Exams</h2>
+                    <div class="upcoming-list" id="upcoming-exams">
+                        <p class="empty-state">No upcoming exams</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Weekly Study Activity -->
+            <section class="activity-section">
+                <h2>📊 Weekly Study Activity</h2>
+                <div class="chart-container">
+                    <canvas id="weeklyChart"></canvas>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Focus Timer Modal -->
+    <div id="focusModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeFocusTimer()">&times;</span>
+            <h2>⏱️ Focus Timer (Pomodoro)</h2>
+            <div class="timer-display">
+                <div class="time" id="timerDisplay">25:00</div>
+            </div>
+            <div class="timer-controls">
+                <button onclick="startTimer()" class="timer-btn">Start</button>
+                <button onclick="pauseTimer()" class="timer-btn">Pause</button>
+                <button onclick="resetTimer()" class="timer-btn">Reset</button>
+            </div>
+            <div class="timer-options">
+                <label>
+                    <input type="radio" name="session-type" value="25" checked> 25 min Focus
+                </label>
+                <label>
+                    <input type="radio" name="session-type" value="5"> 5 min Break
+                </label>
+                <label>
+                    <input type="radio" name="session-type" value="15"> 15 min Long Break
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const userId = {{ user.id }};
+        let timerInterval = null;
+        let timeRemaining = 25 * 60;
+        let timerRunning = false;
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(`/api/dashboard?user_id=${userId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('greeting').textContent = data.greeting;
+                    updateStudyStats(data);
+                    updateUpcomingItems(data);
+                    loadWeeklyStats();
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function updateStudyStats(data) {
+            // Update today's study time
+            const hours = Math.floor(data.today_study_time / 60);
+            const minutes = data.today_study_time % 60;
+            document.getElementById('today-study-time').textContent = `${hours}h ${minutes}m`;
+            
+            // Update progress bar
+            const progress = (data.today_study_time / data.study_goal) * 100;
+            document.getElementById('study-progress').style.width = Math.min(progress, 100) + '%';
+            document.getElementById('goal-text').textContent = `Goal: ${data.study_goal}m`;
+            
+            // Update group count
+            document.getElementById('group-count').textContent = data.groups.length;
+        }
+
+        function updateUpcomingItems(data) {
+            // Update upcoming tasks
+            const tasksContainer = document.getElementById('upcoming-tasks');
+            if (data.upcoming_tasks.length > 0) {
+                tasksContainer.innerHTML = data.upcoming_tasks.map(task => `
+                    <div class="item-card">
+                        <div class="item-header">
+                            <h3>${task.title}</h3>
+                            <span class="priority-${task.priority}">${task.priority}</span>
+                        </div>
+                        <p class="group-name">${task.group_name}</p>
+                        <p class="due-date">Due: ${task.due_date}</p>
+                    </div>
+                `).join('');
+            }
+
+            // Update upcoming exams
+            const examsContainer = document.getElementById('upcoming-exams');
+            if (data.upcoming_exams.length > 0) {
+                examsContainer.innerHTML = data.upcoming_exams.map(exam => {
+                    const examDate = new Date(exam.exam_date);
+                    const today = new Date();
+                    const daysLeft = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
+                    return `
+                        <div class="item-card">
+                            <div class="item-header">
+                                <h3>${exam.title}</h3>
+                                <span class="days-left">${daysLeft} days</span>
+                            </div>
+                            <p class="group-name">${exam.group_name}</p>
+                            <p class="due-date">📅 ${exam.exam_date}</p>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        async function loadWeeklyStats() {
+            try {
+                const response = await fetch(`/api/statistics/weekly?user_id=${userId}`);
+                const data = await response.json();
+                
+                if (data.success && data.stats.length > 0) {
+                    drawWeeklyChart(data.stats);
+                }
+            } catch (error) {
+                console.error('Error loading weekly stats:', error);
+            }
+        }
+
+        function drawWeeklyChart(stats) {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            const labels = stats.map(s => new Date(s.date).toLocaleDateString('en-US', { weekday: 'short' }));
+            const data = stats.map(s => s.study_time);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Study Time (minutes)',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(153, 102, 255, 0.7)',
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(255, 205, 86, 0.7)',
+                            'rgba(201, 203, 207, 0.7)',
+                            'rgba(54, 162, 235, 0.7)',
+                            'rgba(255, 99, 132, 0.7)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Minutes'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Timer functions
+        function openFocusTimer() {
+            document.getElementById('focusModal').style.display = 'block';
+        }
+
+        function closeFocusTimer() {
+            document.getElementById('focusModal').style.display = 'none';
+        }
+
+        function startTimer() {
+            if (timerRunning) return;
+            timerRunning = true;
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+                if (timeRemaining === 0) {
+                    clearInterval(timerInterval);
+                    timerRunning = false;
+                    completeSession();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerRunning = false;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            timeRemaining = 25 * 60;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timeRemaining / 60);
+            const secs = timeRemaining % 60;
+            document.getElementById('timerDisplay').textContent = 
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function completeSession() {
+            try {
+                await fetch('/api/sessions/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        duration: 25
+                    })
+                });
+                alert('Great! Study session recorded! 🎉');
+                closeFocusTimer();
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error saving session:', error);
+            }
+        }
+
+        function openAddTask() {
+            alert('Add task feature coming soon!');
+        }
+
+        function openAddSubject() {
+            alert('Add subject feature coming soon!');
+        }
+
+        function openAddNote() {
+            alert('Add note feature coming soon!');
+        }
+
+        function openSchedule() {
+            alert('Schedule view coming soon!');
+        }
+
+        // Update date display
+        function updateDateDisplay() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const today = new Date();
+            document.getElementById('date-display').textContent = today.toLocaleDateString('en-US', options);
+        }
+
+        // Initialize
+        updateDateDisplay();
+        loadDashboardData();
+
+        // Refresh dashboard every 5 minutes
+        setInterval(loadDashboardData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ channel.channel_name }} - StudyZen</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/discord.css') }}">
+</head>
+<body class="discord-layout">
+    <div class="discord-container">
+        <!-- Left Sidebar - Groups -->
+        <aside class="discord-servers">
+            <a href="{{ url_for('community') }}" class="server-icon" title="All Groups">
+                📚
+            </a>
+            <div class="servers-divider"></div>
+            <!-- Add more server navigation here -->
+        </aside>
+
+        <!-- Channel Sidebar -->
+        <aside class="discord-channels">
+            <div class="channel-header">
+                <h2>{{ channel.group_name }}</h2>
+                <a href="{{ url_for('view_group', group_id=channel.group_id) }}" class="btn-small">Back</a>
+            </div>
+
+            <div class="channels-list">
+                <div class="channels-category">
+                    <p class="category-title">CHANNELS</p>
+                    {% for ch in channels %}
+                        <a href="{{ url_for('view_channel', channel_id=ch.id) }}" 
+                           class="channel-item {% if ch.id == channel.id %}active{% endif %}">
+                            <span>#</span> {{ ch.channel_name }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="channel-footer">
+                <div class="user-info">
+                    {% if user.profile_picture %}
+                        <img src="{{ user.profile_picture }}" alt="{{ user.name }}" class="user-avatar-small">
+                    {% else %}
+                        <div class="user-avatar-small">{{ user.name[0] }}</div>
+                    {% endif %}
+                    <div class="user-details">
+                        <p>{{ user.name }}</p>
+                        <small>{{ user_role }}</small>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="discord-content">
+            <!-- Top Header -->
+            <div class="channel-top">
+                <div class="channel-info">
+                    <h1><span>#</span>{{ channel.channel_name }}</h1>
+                    {% if channel.description %}
+                        <p>{{ channel.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="channel-actions">
+                    <button class="btn-icon" title="Channel info">ℹ️</button>
+                </div>
+            </div>
+
+            <!-- Messages Area -->
+            <div class="messages-container">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="message">
+                            {% if message.profile_picture %}
+                                <img src="{{ message.profile_picture }}" alt="{{ message.name }}" class="message-avatar">
+                            {% else %}
+                                <div class="message-avatar">{{ message.name[0] }}</div>
+                            {% endif %}
+                            <div class="message-content">
+                                <div class="message-header">
+                                    <strong>{{ message.name }}</strong>
+                                    <span class="message-time">{{ message.created_at.strftime('%b %d, %I:%M %p') }}</span>
+                                </div>
+                                <p>{{ message.content }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="messages-empty">
+                        <p>No messages yet. Be the first to start the conversation! 🌸</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Message Input -->
+            <div class="message-input-area">
+                <form method="post" action="{{ url_for('post_message', channel_id=channel.id) }}" class="message-form">
+                    <input 
+                        type="text" 
+                        name="content" 
+                        placeholder="Message #{{ channel.channel_name }}" 
+                        required
+                        maxlength="2000"
+                    >
+                    <button type="submit" class="btn btn-primary btn-small">Send</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Members -->
+        <aside class="discord-members">
+            <div class="members-header">
+                <h3>Members ({{ members|length }})</h3>
+            </div>
+            <div class="members-list">
+                {% for member in members %}
+                    <div class="member-item" title="{{ member.name }}">
+                        {% if member.profile_picture %}
+                            <img src="{{ member.profile_picture }}" alt="{{ member.name }}" class="member-avatar">
+                        {% else %}
+                            <div class="member-avatar">{{ member.name[0] }}</div>
+                        {% endif %}
+                        <div class="member-info">
+                            <p>{{ member.name }}</p>
+                            <small class="member-role">{{ member.role }}</small>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </aside>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Auto-scroll to latest message
+        const messagesContainer = document.querySelector('.messages-container');
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>

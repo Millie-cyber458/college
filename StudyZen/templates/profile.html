@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StudyZen | Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <nav class="navbar container">
+            <div class="logo-wrap">
+                <div class="logo-icon">📚</div>
+                <span class="logo-text">StudyZen</span>
+            </div>
+
+            <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+
+            <div class="nav-menu">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('about') }}">About</a>
+                <a href="{{ url_for('profile') }}" class="active">Profile</a>
+
+                {% if user %}
+                    <a href="{{ url_for('profile') }}" class="user-pill">{{ user.name }}</a>
+                {% else %}
+                    <button type="button" class="btn btn-primary btn-small login-open-btn" data-modal="googleLoginModal">Login with Google</button>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <div id="googleLoginModal" class="modal hidden" aria-modal="true" role="dialog">
+        <div class="modal-backdrop" data-close-modal="true"></div>
+        <div class="login-card">
+            <button class="close-modal" type="button" aria-label="Close login modal">×</button>
+            <div class="login-logo">
+                <span>📚</span>
+            </div>
+            <h2>Welcome to StudyZen 🌸</h2>
+            <p>Log in before you continue</p>
+            <a href="{{ url_for('login') }}" class="btn btn-primary google-button">
+                <span class="google-icon">G</span>
+                Continue with Google
+            </a>
+            <small>Your account will be used to securely access StudyZen's community.</small>
+        </div>
+    </div>
+
+    <main class="page-main">
+        {% if not logged_in %}
+            <section class="locked-section container">
+                <div class="locked-card">
+                    <div class="locked-icon">🔒</div>
+                    <h1>Please Login to View Your Profile</h1>
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Login with Google</a>
+                </div>
+            </section>
+        {% else %}
+            <section class="profile-section container">
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <img src="{{ user.profile_picture or 'https://ui-avatars.com/api/?name=' + user.name + '&background=F8C8DC&color=3A2630' }}" alt="Profile picture" class="profile-avatar">
+                        <div>
+                            <h1>{{ user.name }}</h1>
+                            <p>{{ user.email }}</p>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats">
+                        <div class="stat-box">
+                            <strong>{{ total_groups or 0 }}</strong>
+                            <span>Groups joined</span>
+                        </div>
+                        <div class="stat-box">
+                            <strong>{{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'New' }}</strong>
+                            <span>Date joined</span>
+                        </div>
+                    </div>
+
+                    <div class="joined-groups">
+                        <h2>Joined Study Groups</h2>
+                        {% if joined_groups %}
+                            <ul>
+                                {% for group in joined_groups %}
+                                    <li>{{ group.group_name }} <span>({{ group.category }})</span></li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p>No groups joined yet.</p>
+                        {% endif %}
+                    </div>
+
+                    <a href="{{ url_for('logout') }}" class="btn btn-primary">Logout</a>
+                </div>
+            </section>
+        {% endif %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-grid">
+            <div>
+                <div class="logo-wrap footer-logo">
+                    <div class="logo-icon">📚</div>
+                    <span class="logo-text">StudyZen</span>
+                </div>
+                <p>Study together. Grow together.</p>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('about') }}">About</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('about') }}">Guidelines</a>
+            </div>
+            <div class="socials">
+                <span>💗</span>
+                <span>🌸</span>
+                <span>⭐</span>
+            </div>
+        </div>
+        <div class="footer-bottom">© 2026 StudyZen. All Rights Reserved.</div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

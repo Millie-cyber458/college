@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StudyZen | About</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <nav class="navbar container">
+            <div class="logo-wrap">
+                <div class="logo-icon">📚</div>
+                <span class="logo-text">StudyZen</span>
+            </div>
+
+            <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+
+            <div class="nav-menu">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('about') }}" class="active">About</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+
+                {% if user %}
+                    <a href="{{ url_for('profile') }}" class="user-pill">{{ user.name }}</a>
+                {% else %}
+                    <button type="button" class="btn btn-primary btn-small login-open-btn" data-modal="googleLoginModal">Login with Google</button>
+                {% endif %}
+            </div>
+        </nav>
+    </header>
+
+    <div id="googleLoginModal" class="modal hidden" aria-modal="true" role="dialog">
+        <div class="modal-backdrop" data-close-modal="true"></div>
+        <div class="login-card">
+            <button class="close-modal" type="button" aria-label="Close login modal">×</button>
+            <div class="login-logo">
+                <span>📚</span>
+            </div>
+            <h2>Welcome to StudyZen 🌸</h2>
+            <p>Log in before you continue</p>
+            <a href="{{ url_for('login') }}" class="btn btn-primary google-button">
+                <span class="google-icon">G</span>
+                Continue with Google
+            </a>
+            <small>Your account will be used to securely access StudyZen's community.</small>
+        </div>
+    </div>
+
+    <main class="page-main">
+        <section class="about-hero container">
+            <div class="about-copy">
+                <p class="eyebrow">About StudyZen</p>
+                <h1>About StudyZen</h1>
+                <p class="lead">A peaceful place to learn, connect and grow.</p>
+                <p>
+                    StudyZen is a student-focused community designed to help learners find study partners
+                    and groups based on their interests and subjects.
+                </p>
+            </div>
+            <div class="about-illustration">
+                <div class="illustration-frame">📖</div>
+            </div>
+        </section>
+
+        <section class="container why-section">
+            <div class="section-heading center">
+                <p class="eyebrow">Why StudyZen?</p>
+                <h2>Study with joy and purpose</h2>
+            </div>
+
+            <div class="why-grid">
+                <article class="why-card">
+                    <span class="why-icon">📚</span>
+                    <h3>Learn Together</h3>
+                    <p>Build confidence by learning with others who share your goals.</p>
+                </article>
+
+                <article class="why-card">
+                    <span class="why-icon">🤝</span>
+                    <h3>Meet New People</h3>
+                    <p>Connect with students who enjoy the same subjects and ideas.</p>
+                </article>
+
+                <article class="why-card">
+                    <span class="why-icon">⭐</span>
+                    <h3>Stay Motivated</h3>
+                    <p>Keep going with accountability, encouragement and friendly competition.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-grid">
+            <div>
+                <div class="logo-wrap footer-logo">
+                    <div class="logo-icon">📚</div>
+                    <span class="logo-text">StudyZen</span>
+                </div>
+                <p>Study together. Grow together.</p>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('about') }}">About</a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('about') }}">Guidelines</a>
+            </div>
+            <div class="socials">
+                <span>💗</span>
+                <span>🌸</span>
+                <span>⭐</span>
+            </div>
+        </div>
+        <div class="footer-bottom">© 2026 StudyZen. All Rights Reserved.</div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
