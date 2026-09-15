@@ -83,6 +83,16 @@ def initialize_database():
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace-with-a-secure-secret")
 
+oauth = OAuth(app)
+oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"},
+)
+
+
 # Register API Blueprint
 app.register_blueprint(api_bp)
 
@@ -496,4 +506,4 @@ def join_group(group_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5001)
