@@ -1,24 +1,26 @@
-import mysql.connector
+import psycopg2
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-conn = mysql.connector.connect(
+# Create a PostgreSQL connection
+conn = psycopg2.connect(
     host=os.getenv("DB_HOST", "localhost"),
-    port=int(os.getenv("DB_PORT", "3306")),
-    user=os.getenv("DB_USER", "root"),
+    port=int(os.getenv("DB_PORT", "5432")),
+    user=os.getenv("DB_USER", "postgres"),
     password=os.getenv("DB_PASSWORD", ""),
-    database=os.getenv("DB_NAME", "studyzen"),
-    autocommit=True,
+    dbname=os.getenv("DB_NAME", "studyzen"),
 )
+conn.autocommit = True
 
 cursor = conn.cursor()
 
-# Create a test user
+# Create a test user (ON CONFLICT handles unique constraints in Postgres)
 cursor.execute("""
-    INSERT IGNORE INTO users (google_id, name, email, profile_picture, created_at)
+    INSERT INTO users (google_id, name, email, profile_picture, created_at)
     VALUES ('test-user-123', 'Test Student', 'test@studyzen.com', '', NOW())
+    ON CONFLICT (email) DO NOTHING
 """)
 
 # Get the user ID
@@ -32,8 +34,9 @@ groups = cursor.fetchall()
 for group in groups:
     group_id = group[0]
     cursor.execute("""
-        INSERT IGNORE INTO group_members (user_id, group_id, role, joined_at)
+        INSERT INTO group_members (user_id, group_id, role, joined_at)
         VALUES (%s, %s, 'member', NOW())
+        ON CONFLICT (user_id, group_id) DO NOTHING
     """, (user_id, group_id))
 
 print(f"✅ Test user created!")

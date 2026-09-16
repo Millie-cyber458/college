@@ -1,4 +1,4 @@
-import mysql.connector
+import psycopg2
 import os
 from dotenv import load_dotenv
 
@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Connect to database
-conn = mysql.connector.connect(
+conn = psycopg2.connect(
     host=os.getenv("DB_HOST", "localhost"),
-    user=os.getenv("DB_USER", "root"),
+    port=int(os.getenv("DB_PORT", "5432")),
+    user=os.getenv("DB_USER", "postgres"),
     password=os.getenv("DB_PASSWORD", ""),
-    database=os.getenv("DB_NAME", "studyzen"),
-    autocommit=True,
-    charset="utf8mb4",
+    dbname=os.getenv("DB_NAME", "postgres")  # Connect to the default "postgres" database for migration,
 )
+conn.autocommit = True
 
 cursor = conn.cursor()
 

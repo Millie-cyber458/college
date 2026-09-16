@@ -1,5 +1,5 @@
 """
-StudyZen API Routes
+StudyZen API Routes - PostgreSQL Edition
 Extended features for community study platform
 - Dashboard
 - Tasks
@@ -17,7 +17,8 @@ from datetime import datetime, date
 from study_utils import StudySessionManager, StreakManager, StatisticsManager, NotificationManager
 import os
 from dotenv import load_dotenv
-import mysql.connector
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
@@ -26,16 +27,16 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 
 def get_db_connection():
-    """Create a MySQL connection"""
-    return mysql.connector.connect(
+    """Create a PostgreSQL connection"""
+    conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", "3306")),
-        user=os.getenv("DB_USER", "root"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        user=os.getenv("DB_USER", "postgres"),
         password=os.getenv("DB_PASSWORD", ""),
-        database=os.getenv("DB_NAME", "studyzen"),
-        autocommit=True,
-        charset="utf8mb4",
+        dbname=os.getenv("DB_NAME", "studyzen")
     )
+    conn.autocommit = True
+    return conn
 
 
 # =====================================================
@@ -51,7 +52,7 @@ def get_dashboard():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         # Get user info
         cursor.execute("SELECT name, email FROM users WHERE id = %s", (user_id,))
@@ -75,7 +76,7 @@ def get_dashboard():
             JOIN group_members gm ON sg.id = gm.group_id
             LEFT JOIN subjects s ON gt.subject_id = s.id
             WHERE gm.user_id = %s AND gt.status IN ('pending', 'in_progress')
-            AND gt.due_date >= CURDATE()
+            AND gt.due_date >= CURRENT_DATE
             ORDER BY gt.due_date ASC
             LIMIT 10
         """, (user_id,))
@@ -87,10 +88,10 @@ def get_dashboard():
                    sg.group_name, s.subject_name
             FROM exams e
             JOIN study_groups sg ON e.group_id = sg.id
-            JOIN group_members gm ON sg.id = gm.group_id
+            JOIN group_members gm ON e.group_id = sg.id
             LEFT JOIN subjects s ON e.subject_id = s.id
             WHERE gm.user_id = %s AND e.status = 'upcoming'
-            AND e.exam_date >= CURDATE()
+            AND e.exam_date >= CURRENT_DATE
             ORDER BY e.exam_date ASC
             LIMIT 5
         """, (user_id,))
@@ -102,7 +103,7 @@ def get_dashboard():
         # Get study goal
         cursor.execute("SELECT study_goal FROM user_settings WHERE user_id = %s", (user_id,))
         study_goal_result = cursor.fetchone()
-        study_goal = study_goal_result[0] if study_goal_result else 120
+        study_goal = study_goal_result['study_goal'] if study_goal_result else 120
         
         cursor.close()
         conn.close()
@@ -141,11 +142,10 @@ def manage_group_tasks(group_id):
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         if request.method == 'GET':
-            # Get tasks with optional filters
-            status_filter = request.args.get('status')  # pending, in_progress, completed
+            status_filter = request.args.get('status')
             subject_id = request.args.get('subject_id')
             priority_filter = request.args.get('priority')
             
@@ -177,7 +177,6 @@ def manage_group_tasks(group_id):
             cursor.execute(query, params)
             tasks = cursor.fetchall()
             
-            # Count completed/pending
             cursor.execute("""
                 SELECT status, COUNT(*) as count
                 FROM group_tasks
@@ -185,9 +184,7 @@ def manage_group_tasks(group_id):
                 GROUP BY status
             """, (group_id,))
             
-            counts = {}
-            for row in cursor.fetchall():
-                counts[row['status']] = row['count']
+            counts = {row['status']: row['count'] for row in cursor.fetchall()}
             
             cursor.close()
             conn.close()
@@ -199,7 +196,6 @@ def manage_group_tasks(group_id):
             })
         
         elif request.method == 'POST':
-            # Create new task
             data = request.json
             
             cursor.execute("""
@@ -207,13 +203,13 @@ def manage_group_tasks(group_id):
                 (group_id, subject_id, title, description, assigned_by, 
                  assigned_to, priority, due_date, due_time, status)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             """, (group_id, data.get('subject_id'), data['title'],
                   data.get('description'), user_id, data.get('assigned_to'),
                   data.get('priority', 'medium'), data.get('due_date'),
                   data.get('due_time'), 'pending'))
             
-            task_id = cursor.lastrowid
-            conn.commit()
+            task_id = cursor.fetchone()['id']
             cursor.close()
             conn.close()
             
@@ -226,10 +222,9 @@ def manage_group_tasks(group_id):
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT', 'DELETE'])
 def update_task(task_id):
     """Update or delete a task"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         if request.method == 'PUT':
             data = request.json
             
@@ -237,20 +232,16 @@ def update_task(task_id):
                 UPDATE group_tasks
                 SET title = %s, description = %s, status = %s, 
                     priority = %s, due_date = %s, due_time = %s,
-                    completed_at = CASE WHEN %s = 'completed' THEN NOW() ELSE NULL END
+                    completed_at = CASE WHEN %s::text = 'completed' THEN NOW() ELSE NULL END
                 WHERE id = %s
             """, (data.get('title'), data.get('description'), data.get('status'),
                   data.get('priority'), data.get('due_date'), data.get('due_time'),
                   data.get('status'), task_id))
             
-            conn.commit()
-            
             return jsonify({'success': True})
         
         elif request.method == 'DELETE':
             cursor.execute("DELETE FROM group_tasks WHERE id = %s", (task_id,))
-            conn.commit()
-            
             return jsonify({'success': True})
     
     except Exception as e:
@@ -272,7 +263,7 @@ def start_study_session():
     group_id = data.get('group_id')
     subject_id = data.get('subject_id')
     task_id = data.get('task_id')
-    duration = int(data.get('duration', 25))  # Default 25 min Pomodoro
+    duration = int(data.get('duration', 25))
     
     try:
         conn = get_db_connection()
@@ -283,15 +274,8 @@ def start_study_session():
             duration, duration, 'focus'
         )
         
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        # Update streak
-        conn = get_db_connection()
-        cursor = conn.cursor()
         StreakManager.update_streak(cursor, user_id, group_id)
-        conn.commit()
+        
         cursor.close()
         conn.close()
         
@@ -311,14 +295,14 @@ def get_today_sessions():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         today_time = StudySessionManager.get_user_study_time_today(cursor, user_id)
         
         cursor.execute("""
             SELECT duration_minutes, session_type, started_at
             FROM study_sessions
-            WHERE user_id = %s AND DATE(started_at) = CURDATE()
+            WHERE user_id = %s AND started_at::date = CURRENT_DATE
             ORDER BY started_at DESC
         """, (user_id,))
         
@@ -347,7 +331,7 @@ def manage_group_notes(group_id):
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         if request.method == 'GET':
             subject_id = request.args.get('subject_id')
@@ -383,11 +367,11 @@ def manage_group_notes(group_id):
                 INSERT INTO group_notes
                 (group_id, subject_id, channel_id, created_by, title, content)
                 VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
             """, (group_id, data.get('subject_id'), data.get('channel_id'),
                   user_id, data['title'], data['content']))
             
-            note_id = cursor.lastrowid
-            conn.commit()
+            note_id = cursor.fetchone()['id']
             cursor.close()
             conn.close()
             
@@ -408,13 +392,13 @@ def manage_exams(group_id):
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         if request.method == 'GET':
             cursor.execute("""
                 SELECT e.id, e.title, e.exam_date, e.exam_time, e.exam_type,
                        e.location, e.description, s.subject_name,
-                       DATEDIFF(e.exam_date, CURDATE()) as days_left
+                       (e.exam_date - CURRENT_DATE) as days_left
                 FROM exams e
                 LEFT JOIN subjects s ON e.subject_id = s.id
                 WHERE e.group_id = %s AND e.status = 'upcoming'
@@ -422,7 +406,6 @@ def manage_exams(group_id):
             """, (group_id,))
             
             exams = cursor.fetchall()
-            
             cursor.close()
             conn.close()
             
@@ -436,13 +419,13 @@ def manage_exams(group_id):
                 (group_id, subject_id, title, exam_type, exam_date, 
                  exam_time, location, description, created_by, status)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             """, (group_id, data.get('subject_id'), data['title'],
                   data.get('exam_type', 'exam'), data['exam_date'],
                   data.get('exam_time'), data.get('location'),
                   data.get('description'), user_id, 'upcoming'))
             
-            exam_id = cursor.lastrowid
-            conn.commit()
+            exam_id = cursor.fetchone()['id']
             cursor.close()
             conn.close()
             
@@ -467,7 +450,7 @@ def get_weekly_statistics():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         stats = StatisticsManager.get_weekly_stats(cursor, user_id, group_id)
         
@@ -495,7 +478,7 @@ def get_streak():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         streak = StreakManager.get_streak(cursor, user_id, group_id)
         
@@ -522,7 +505,7 @@ def manage_notifications():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         if request.method == 'GET':
             notifications = NotificationManager.get_unread_notifications(cursor, user_id)
@@ -537,7 +520,6 @@ def manage_notifications():
             notif_id = data.get('notification_id')
             
             NotificationManager.mark_as_read(cursor, notif_id)
-            conn.commit()
             
             cursor.close()
             conn.close()
@@ -562,7 +544,7 @@ def manage_settings():
     
     try:
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         if request.method == 'GET':
             cursor.execute("""
@@ -591,7 +573,6 @@ def manage_settings():
                   data.get('study_goal_minutes'), data.get('pomodoro_duration'),
                   user_id))
             
-            conn.commit()
             cursor.close()
             conn.close()
             
