@@ -91,7 +91,7 @@ def initialize_database():
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace-with-a-secure-secret")
-app.config["SERVER_NAME"] = "localhost:5001"
+
 
 oauth = OAuth(app)
 oauth.register(
