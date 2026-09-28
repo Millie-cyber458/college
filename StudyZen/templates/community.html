@@ -8,6 +8,30 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .create-group { margin: 0 0 24px; }
+        .create-group summary { list-style: none; cursor: pointer; display: inline-block; }
+        .create-group summary::-webkit-details-marker { display: none; }
+        .create-group-form {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 20px;
+            max-width: 520px;
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
+        .create-group-form input,
+        .create-group-form textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font: inherit;
+            box-sizing: border-box;
+        }
+    </style>
 </head>
 <body>
     <header class="site-header">
@@ -22,6 +46,9 @@
             <div class="nav-menu">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}" class="active">Community</a>
+                {% if user %}
+                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                {% endif %}
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
 
@@ -71,6 +98,16 @@
                     </div>
                     <a href="{{ url_for('logout') }}" class="btn btn-outline">Logout</a>
                 </div>
+
+                <details class="create-group">
+                    <summary class="btn btn-primary">+ Create a Group</summary>
+                    <form class="create-group-form" method="post" action="{{ url_for('create_group') }}">
+                        <input type="text" name="group_name" placeholder="Group name" maxlength="255" required>
+                        <textarea name="description" placeholder="What is this group about?" rows="3" required></textarea>
+                        <input type="text" name="category" placeholder="Emoji icon, e.g. 🧪 (optional)" maxlength="4">
+                        <button type="submit" class="btn btn-primary">Create Group</button>
+                    </form>
+                </details>
 
                 <div class="groups-grid">
                     {% for group in groups %}
