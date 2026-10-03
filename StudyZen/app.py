@@ -505,6 +505,41 @@ def join_group(group_id):
     conn.close()
     return redirect(url_for("view_group", group_id=group_id))
 
+@app.route("/create-group", methods=["POST"])
+def create_group():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+
+    name = request.form.get("group_name", "").strip()
+    description = request.form.get("description", "").strip()
+    icon = request.form.get("category", "").strip() or "📚"
+
+    if not name or not description:
+        return redirect(url_for("community"))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO study_groups (group_name, description, category, member_count)
+        VALUES (%s, %s, %s, 1) RETURNING id
+        """,
+        (name, description, icon),
+    )
+    group_id = cursor.fetchone()[0]
+    cursor.execute(
+        "INSERT INTO group_members (user_id, group_id, role) VALUES (%s, %s, 'admin')",
+        (user["id"], group_id),
+    )
+    cursor.execute(
+        "INSERT INTO channels (group_id, channel_name, description) VALUES (%s, 'general', 'General discussion')",
+        (group_id,),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for("view_group", group_id=group_id))
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5001)
