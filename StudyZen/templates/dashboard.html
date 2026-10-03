@@ -16,7 +16,7 @@
                 <h2>🌱 StudyZen</h2>
                 <button class="menu-toggle" id="menu-toggle">☰</button>
             </div>
-            
+
             <nav class="sidebar-nav">
                 <a href="{{ url_for('dashboard') }}" class="nav-link active">
                     <span class="icon">🏠</span> Dashboard
@@ -43,7 +43,7 @@
                     <span class="icon">👤</span> Profile
                 </a>
             </nav>
-            
+
             <div class="sidebar-footer">
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
             </div>
@@ -93,7 +93,7 @@
                         <p class="stat-label">Tasks Completed</p>
                         <p class="stat-value" id="tasks-completed">0</p>
                     </div>
-                    <p class="task-text" id="task-text">Out of 0 tasks</p>
+                    <p class="task-text" id="task-text">Today</p>
                 </div>
 
                 <div class="stat-card">
@@ -186,6 +186,8 @@
     </div>
 
     <script>
+        // The backend identifies you from your login session, not this value —
+        // kept only for readability in the fetch URLs below.
         const userId = {{ user.id }};
         let timerInterval = null;
         let timeRemaining = 25 * 60;
@@ -196,11 +198,12 @@
             try {
                 const response = await fetch(`/api/dashboard?user_id=${userId}`);
                 const data = await response.json();
-                
+
                 if (data.success) {
                     document.getElementById('greeting').textContent = data.greeting;
                     updateStudyStats(data);
                     updateUpcomingItems(data);
+                    loadStreak();
                     loadWeeklyStats();
                 }
             } catch (error) {
@@ -213,12 +216,12 @@
             const hours = Math.floor(data.today_study_time / 60);
             const minutes = data.today_study_time % 60;
             document.getElementById('today-study-time').textContent = `${hours}h ${minutes}m`;
-            
+
             // Update progress bar
             const progress = (data.today_study_time / data.study_goal) * 100;
             document.getElementById('study-progress').style.width = Math.min(progress, 100) + '%';
             document.getElementById('goal-text').textContent = `Goal: ${data.study_goal}m`;
-            
+
             // Update group count
             document.getElementById('group-count').textContent = data.groups.length;
         }
@@ -260,17 +263,45 @@
             }
         }
 
+        // Fills in the Study Streak card using /api/streak
+        async function loadStreak() {
+            try {
+                const response = await fetch(`/api/streak?user_id=${userId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const { current, max } = data.streak;
+                    document.getElementById('streak-count').textContent = current;
+                    document.getElementById('streak-text').textContent =
+                        current > 0 ? `Best: ${max} day${max === 1 ? '' : 's'}` : 'Start a session to begin your streak';
+                }
+            } catch (error) {
+                console.error('Error loading streak:', error);
+            }
+        }
+
         async function loadWeeklyStats() {
             try {
                 const response = await fetch(`/api/statistics/weekly?user_id=${userId}`);
                 const data = await response.json();
-                
-                if (data.success && data.stats.length > 0) {
-                    drawWeeklyChart(data.stats);
+
+                if (data.success) {
+                    if (data.stats.length > 0) {
+                        drawWeeklyChart(data.stats);
+                    }
+                    updateTasksCompletedCard(data.stats);
                 }
             } catch (error) {
                 console.error('Error loading weekly stats:', error);
             }
+        }
+
+        // Fills in the Tasks Completed card using today's entry from the weekly stats
+        function updateTasksCompletedCard(stats) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayEntry = stats.find(s => s.date === todayStr);
+            const completedToday = todayEntry ? todayEntry.tasks_completed : 0;
+            document.getElementById('tasks-completed').textContent = completedToday;
         }
 
         function drawWeeklyChart(stats) {
@@ -356,7 +387,7 @@
         function updateTimerDisplay() {
             const mins = Math.floor(timeRemaining / 60);
             const secs = timeRemaining % 60;
-            document.getElementById('timerDisplay').textContent = 
+            document.getElementById('timerDisplay').textContent =
                 `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
 
@@ -366,7 +397,6 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_id: userId,
                         duration: 25
                     })
                 });

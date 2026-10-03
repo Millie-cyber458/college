@@ -138,7 +138,7 @@ def get_dashboard():
             """, (user_id,))
             upcoming_tasks = cursor.fetchall()
 
-            # Get upcoming exams (FIXED: join members on the exam's group)
+            # Get upcoming exams (joins members on the exam's own group)
             cursor.execute("""
                 SELECT e.id, e.title, e.exam_date, e.exam_type,
                        sg.group_name, s.subject_name
@@ -156,7 +156,7 @@ def get_dashboard():
             # Get today's study time
             today_study_time = StudySessionManager.get_user_study_time_today(cursor, user_id)
 
-            # Get study goal (FIXED: column is study_goal_minutes)
+            # Get study goal (column is study_goal_minutes)
             cursor.execute(
                 "SELECT study_goal_minutes FROM user_settings WHERE user_id = %s",
                 (user_id,),
@@ -207,7 +207,7 @@ def manage_group_tasks(group_id):
                 subject_id = request.args.get('subject_id')
                 priority_filter = request.args.get('priority')
 
-                # FIXED: due_time cast to text so it can be turned into JSON
+                # due_time cast to text so it can be turned into JSON
                 query = """
                     SELECT gt.id, gt.title, gt.description, gt.priority,
                            gt.due_date, gt.due_time::text AS due_time, gt.status,
@@ -231,7 +231,7 @@ def manage_group_tasks(group_id):
                     query += " AND gt.priority = %s"
                     params.append(priority_filter)
 
-                # FIXED: sort priority by meaning (high first), not alphabetically
+                # sort priority by meaning (high first), not alphabetically
                 query += """
                     ORDER BY gt.due_date ASC,
                              CASE gt.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END
@@ -296,7 +296,7 @@ def update_task(task_id):
             if request.method == 'PUT':
                 data = request.get_json(silent=True) or {}
 
-                # FIXED: fields not sent are left unchanged instead of set to NULL
+                # fields not sent are left unchanged instead of set to NULL
                 cursor.execute("""
                     UPDATE group_tasks
                     SET title = COALESCE(%s, title),
@@ -347,7 +347,9 @@ def start_study_session():
         return jsonify({'error': 'duration must be between 1 and 240 minutes'}), 400
 
     try:
-        with db_cursor(dict_rows=False) as cursor:
+        # CHANGED: dict_rows=False -> default (dict cursor), since
+        # StudySessionManager.create_session reads cursor.fetchone()['id']
+        with db_cursor() as cursor:
             if group_id and not is_group_member(cursor, user_id, group_id):
                 return jsonify({'error': 'not a member of this group'}), 403
 
@@ -357,6 +359,10 @@ def start_study_session():
             )
 
             StreakManager.update_streak(cursor, user_id, group_id)
+            # ADDED: without this, daily_statistics never gets populated,
+            # so the dashboard's streak/tasks-completed cards and weekly
+            # chart would always show empty data.
+            StatisticsManager.update_daily_stats(cursor, user_id, group_id)
 
         return jsonify({'success': True, 'session_id': session_id}), 201
 
@@ -468,7 +474,7 @@ def manage_exams(group_id):
                 return jsonify({'error': 'not a member of this group'}), 403
 
             if request.method == 'GET':
-                # FIXED: exam_time cast to text so it can be turned into JSON
+                # exam_time cast to text so it can be turned into JSON
                 cursor.execute("""
                     SELECT e.id, e.title, e.exam_date, e.exam_time::text AS exam_time,
                            e.exam_type, e.location, e.description, s.subject_name,
