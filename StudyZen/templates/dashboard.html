@@ -21,23 +21,11 @@
                 <a href="{{ url_for('dashboard') }}" class="nav-link active">
                     <span class="icon">🏠</span> Dashboard
                 </a>
-                <a href="#tasks" class="nav-link">
-                    <span class="icon">✅</span> Tasks
+                <a href="{{ url_for('community') }}" class="nav-link">
+                    <span class="icon">👥</span> Community
                 </a>
-                <a href="#subjects" class="nav-link">
-                    <span class="icon">📚</span> Subjects
-                </a>
-                <a href="#focus" class="nav-link">
-                    <span class="icon">⏱️</span> Focus Timer
-                </a>
-                <a href="#planner" class="nav-link">
-                    <span class="icon">📅</span> Planner
-                </a>
-                <a href="#notes" class="nav-link">
-                    <span class="icon">📝</span> Notes
-                </a>
-                <a href="#statistics" class="nav-link">
-                    <span class="icon">📊</span> Statistics
+                <a href="{{ url_for('shared_files') }}" class="nav-link">
+                    <span class="icon">📂</span> Shared Library
                 </a>
                 <a href="{{ url_for('profile') }}" class="nav-link">
                     <span class="icon">👤</span> Profile
@@ -88,15 +76,6 @@
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-icon">✅</div>
-                    <div class="stat-content">
-                        <p class="stat-label">Tasks Completed</p>
-                        <p class="stat-value" id="tasks-completed">0</p>
-                    </div>
-                    <p class="task-text" id="task-text">Today</p>
-                </div>
-
-                <div class="stat-card">
                     <div class="stat-icon">📚</div>
                     <div class="stat-content">
                         <p class="stat-label">My Groups</p>
@@ -110,41 +89,15 @@
             <section class="quick-actions">
                 <h2>Quick Actions</h2>
                 <div class="actions-grid">
-                    <button class="action-btn" onclick="openAddTask()">
-                        <span>➕</span> Add Task
-                    </button>
-                    <button class="action-btn" onclick="openAddSubject()">
-                        <span>📚</span> Add Subject
-                    </button>
                     <button class="action-btn" onclick="openFocusTimer()">
                         <span>⏱️</span> Start Focus
-                    </button>
-                    <button class="action-btn" onclick="openAddNote()">
-                        <span>📝</span> Add Notes
-                    </button>
-                    <button class="action-btn" onclick="openSchedule()">
-                        <span>📅</span> View Schedule
                     </button>
                     <button class="action-btn" onclick="window.location.href='{{ url_for('community') }}'">
                         <span>👥</span> Browse Groups
                     </button>
-                </div>
-            </section>
-
-            <!-- Upcoming Tasks & Exams -->
-            <section class="upcoming-section">
-                <div class="upcoming-col">
-                    <h2>📅 Upcoming Tasks</h2>
-                    <div class="upcoming-list" id="upcoming-tasks">
-                        <p class="empty-state">No upcoming tasks</p>
-                    </div>
-                </div>
-
-                <div class="upcoming-col">
-                    <h2>📚 Upcoming Exams</h2>
-                    <div class="upcoming-list" id="upcoming-exams">
-                        <p class="empty-state">No upcoming exams</p>
-                    </div>
+                    <button class="action-btn" onclick="window.location.href='{{ url_for('shared_files') }}'">
+                        <span>📂</span> Shared Library
+                    </button>
                 </div>
             </section>
 
@@ -186,9 +139,6 @@
     </div>
 
     <script>
-        // The backend identifies you from your login session, not this value —
-        // kept only for readability in the fetch URLs below.
-        const userId = {{ user.id }};
         let timerInterval = null;
         let timeRemaining = 25 * 60;
         let timerRunning = false;
@@ -196,13 +146,12 @@
         // Load dashboard data
         async function loadDashboardData() {
             try {
-                const response = await fetch(`/api/dashboard?user_id=${userId}`);
+                const response = await fetch('/api/dashboard');
                 const data = await response.json();
 
                 if (data.success) {
                     document.getElementById('greeting').textContent = data.greeting;
                     updateStudyStats(data);
-                    updateUpcomingItems(data);
                     loadStreak();
                     loadWeeklyStats();
                 }
@@ -226,47 +175,10 @@
             document.getElementById('group-count').textContent = data.groups.length;
         }
 
-        function updateUpcomingItems(data) {
-            // Update upcoming tasks
-            const tasksContainer = document.getElementById('upcoming-tasks');
-            if (data.upcoming_tasks.length > 0) {
-                tasksContainer.innerHTML = data.upcoming_tasks.map(task => `
-                    <div class="item-card">
-                        <div class="item-header">
-                            <h3>${task.title}</h3>
-                            <span class="priority-${task.priority}">${task.priority}</span>
-                        </div>
-                        <p class="group-name">${task.group_name}</p>
-                        <p class="due-date">Due: ${task.due_date}</p>
-                    </div>
-                `).join('');
-            }
-
-            // Update upcoming exams
-            const examsContainer = document.getElementById('upcoming-exams');
-            if (data.upcoming_exams.length > 0) {
-                examsContainer.innerHTML = data.upcoming_exams.map(exam => {
-                    const examDate = new Date(exam.exam_date);
-                    const today = new Date();
-                    const daysLeft = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
-                    return `
-                        <div class="item-card">
-                            <div class="item-header">
-                                <h3>${exam.title}</h3>
-                                <span class="days-left">${daysLeft} days</span>
-                            </div>
-                            <p class="group-name">${exam.group_name}</p>
-                            <p class="due-date">📅 ${exam.exam_date}</p>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-
         // Fills in the Study Streak card using /api/streak
         async function loadStreak() {
             try {
-                const response = await fetch(`/api/streak?user_id=${userId}`);
+                const response = await fetch('/api/streak');
                 const data = await response.json();
 
                 if (data.success) {
@@ -282,26 +194,15 @@
 
         async function loadWeeklyStats() {
             try {
-                const response = await fetch(`/api/statistics/weekly?user_id=${userId}`);
+                const response = await fetch('/api/statistics/weekly');
                 const data = await response.json();
 
-                if (data.success) {
-                    if (data.stats.length > 0) {
-                        drawWeeklyChart(data.stats);
-                    }
-                    updateTasksCompletedCard(data.stats);
+                if (data.success && data.stats.length > 0) {
+                    drawWeeklyChart(data.stats);
                 }
             } catch (error) {
                 console.error('Error loading weekly stats:', error);
             }
-        }
-
-        // Fills in the Tasks Completed card using today's entry from the weekly stats
-        function updateTasksCompletedCard(stats) {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const todayEntry = stats.find(s => s.date === todayStr);
-            const completedToday = todayEntry ? todayEntry.tasks_completed : 0;
-            document.getElementById('tasks-completed').textContent = completedToday;
         }
 
         function drawWeeklyChart(stats) {
@@ -406,22 +307,6 @@
             } catch (error) {
                 console.error('Error saving session:', error);
             }
-        }
-
-        function openAddTask() {
-            alert('Add task feature coming soon!');
-        }
-
-        function openAddSubject() {
-            alert('Add subject feature coming soon!');
-        }
-
-        function openAddNote() {
-            alert('Add note feature coming soon!');
-        }
-
-        function openSchedule() {
-            alert('Schedule view coming soon!');
         }
 
         // Update date display
