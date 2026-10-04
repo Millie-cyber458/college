@@ -5,6 +5,8 @@ StudyZen Utility Functions
 - Statistics aggregation
 - Notification helpers
 
+All functions expect a psycopg2 RealDictCursor (dict-style row access),
+since that's what api_routes.py passes in everywhere.
 """
 
 from datetime import date, timedelta
@@ -156,6 +158,43 @@ class StreakManager:
                 'last_date': str(result['last_study_date']) if result['last_study_date'] else None
             }
         return {'current': 0, 'max': 0, 'last_date': None}
+
+    @staticmethod
+    def update_login_streak(cursor, user_id):
+        """Update the user's personal streak just for visiting today — no study session required."""
+        today = date.today()
+
+        cursor.execute("""
+            SELECT id, current_streak, last_study_date
+            FROM study_streaks
+            WHERE user_id = %s AND group_id IS NULL
+        """, (user_id,))
+        streak_record = cursor.fetchone()
+
+        if streak_record:
+            current_streak = streak_record['current_streak']
+            last_date = streak_record['last_study_date']
+
+            if last_date == today:
+                return  # already counted today
+            elif last_date == today - timedelta(days=1):
+                current_streak += 1
+            else:
+                current_streak = 1  # streak broken, restart
+
+            cursor.execute("""
+                UPDATE study_streaks
+                SET current_streak = %s,
+                    last_study_date = %s,
+                    max_streak = GREATEST(max_streak, %s)
+                WHERE user_id = %s AND group_id IS NULL
+            """, (current_streak, today, current_streak, user_id))
+        else:
+            cursor.execute("""
+                INSERT INTO study_streaks
+                (user_id, group_id, current_streak, max_streak, last_study_date)
+                VALUES (%s, NULL, %s, %s, %s)
+            """, (user_id, 1, 1, today))
 
 
 class StatisticsManager:

@@ -6,7 +6,7 @@ import psycopg2
 import psycopg2.extras
 from api_routes import api_bp
 from study_utils import StudySessionManager, StreakManager, StatisticsManager
-
+from datetime import date
 # Load environment variables from .env
 load_dotenv()
 
@@ -108,6 +108,26 @@ app.register_blueprint(api_bp)
 
 # Initialize database tables
 initialize_database()
+
+
+@app.before_request
+def update_daily_streak():
+    """Give every logged-in visit today credit toward the user's streak."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return
+    if session.get("streak_counted_date") == str(date.today()):
+        return  # already counted today, skip the DB hit
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        StreakManager.update_login_streak(cursor, user_id)
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+    session["streak_counted_date"] = str(date.today())
 
 
 def get_current_user():

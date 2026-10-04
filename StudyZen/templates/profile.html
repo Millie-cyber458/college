@@ -230,7 +230,10 @@
                         {% if joined_groups %}
                             <ul>
                                 {% for group in joined_groups %}
-                                    <li>{{ group.group_name }} <span>({{ group.category }})</span></li>
+                                    <li>
+                                       <a href="{{ url_for('view_group', group_id=group.id) }}">{{ group.group_name }}</a>
+                    <span>({{ group.category }})</span> 
+                                     
                                 {% endfor %}
                             </ul>
                         {% else %}
@@ -281,7 +284,7 @@
             <div class="footer-links">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}">Community</a>
-                <a href="{{ url_for('shared_files') }}">Shared Library</a>
+               {# <a href="{{ url_for('shared_files') }}">Shared Library</a> #}
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 <a href="{{ url_for('about') }}">Guidelines</a>
