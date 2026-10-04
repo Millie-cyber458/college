@@ -120,7 +120,7 @@ def update_daily_streak():
         return  # already counted today, skip the DB hit
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         StreakManager.update_login_streak(cursor, user_id)
         conn.commit()
