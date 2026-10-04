@@ -180,15 +180,6 @@ def index():
     return render_template("index.html", user=get_current_user())
 
 
-@app.route("/dashboard")
-def dashboard():
-    """Personal dashboard for logged-in users"""
-    user = get_current_user()
-    if not user:
-        return redirect(url_for("login"))
-
-    return render_template("dashboard.html", user=user)
-
 
 @app.route("/community")
 def community():

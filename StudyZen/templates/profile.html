@@ -8,6 +8,118 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .study-activity {
+            margin: 28px 0;
+            padding: 20px;
+            border-radius: 16px;
+            background: #faf7f5;
+        }
+        .study-activity h2 {
+            margin: 0 0 16px;
+        }
+        .activity-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .activity-stat-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+        .activity-stat-card .label {
+            font-size: 0.82rem;
+            color: #888;
+            margin: 0 0 4px;
+        }
+        .activity-stat-card .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0;
+        }
+        .activity-stat-card .sub {
+            font-size: 0.78rem;
+            color: #999;
+            margin: 4px 0 0;
+        }
+        .progress-bar {
+            margin-top: 8px;
+            height: 6px;
+            border-radius: 4px;
+            background: #eee;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #f8a8c6;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        .activity-chart-wrap {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+        .activity-chart-wrap canvas {
+            max-height: 220px;
+        }
+
+        /* Focus Timer Modal (reuses .modal pattern already used for login) */
+        #focusModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        #focusModal .modal-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 360px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+        }
+        #focusModal .close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            cursor: pointer;
+            font-size: 1.4rem;
+        }
+        #focusModal .time {
+            font-size: 2.6rem;
+            font-weight: 700;
+            margin: 16px 0;
+        }
+        #focusModal .timer-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        #focusModal .timer-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: #faf7f5;
+            cursor: pointer;
+        }
+        #focusModal .timer-options {
+            display: grid;
+            gap: 6px;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+    </style>
 </head>
 <body>
     <header class="site-header">
@@ -22,6 +134,7 @@
             <div class="nav-menu">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('shared_files') }}">Shared Library</a>
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}" class="active">Profile</a>
 
@@ -82,6 +195,36 @@
                         </div>
                     </div>
 
+                    <!-- Study Activity: merged in from the old dashboard page -->
+                    <div class="study-activity">
+                        <h2>📊 Study Activity</h2>
+
+                        <div class="activity-stats">
+                            <div class="activity-stat-card">
+                                <p class="label">⏱️ Today's Study Time</p>
+                                <p class="value" id="today-study-time">0h 0m</p>
+                                <p class="sub" id="goal-text">Goal: 120m</p>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="study-progress"></div>
+                                </div>
+                            </div>
+
+                            <div class="activity-stat-card">
+                                <p class="label">🔥 Study Streak</p>
+                                <p class="value" id="streak-count">0</p>
+                                <p class="sub" id="streak-text">Keep it up!</p>
+                            </div>
+                        </div>
+
+                        <div class="activity-chart-wrap">
+                            <canvas id="weeklyChart"></canvas>
+                        </div>
+
+                        <button type="button" class="btn btn-primary" style="margin-top: 16px;" onclick="openFocusTimer()">
+                            ⏱️ Start Focus Timer
+                        </button>
+                    </div>
+
                     <div class="joined-groups">
                         <h2>Joined Study Groups</h2>
                         {% if joined_groups %}
@@ -101,6 +244,31 @@
         {% endif %}
     </main>
 
+    <!-- Focus Timer Modal -->
+    <div id="focusModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeFocusTimer()">&times;</span>
+            <h2>⏱️ Focus Timer (Pomodoro)</h2>
+            <div class="time" id="timerDisplay">25:00</div>
+            <div class="timer-controls">
+                <button onclick="startTimer()" class="timer-btn">Start</button>
+                <button onclick="pauseTimer()" class="timer-btn">Pause</button>
+                <button onclick="resetTimer()" class="timer-btn">Reset</button>
+            </div>
+            <div class="timer-options">
+                <label>
+                    <input type="radio" name="session-type" value="25" checked> 25 min Focus
+                </label>
+                <label>
+                    <input type="radio" name="session-type" value="5"> 5 min Break
+                </label>
+                <label>
+                    <input type="radio" name="session-type" value="15"> 15 min Long Break
+                </label>
+            </div>
+        </div>
+    </div>
+
     <footer class="site-footer">
         <div class="container footer-grid">
             <div>
@@ -113,6 +281,7 @@
             <div class="footer-links">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}">Community</a>
+                <a href="{{ url_for('shared_files') }}">Shared Library</a>
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 <a href="{{ url_for('about') }}">Guidelines</a>
@@ -127,5 +296,142 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    {% if logged_in %}
+    <script>
+        let timerInterval = null;
+        let timeRemaining = 25 * 60;
+        let timerRunning = false;
+
+        async function loadStudyActivity() {
+            try {
+                const dashRes = await fetch('/api/dashboard');
+                const dashData = await dashRes.json();
+                if (dashData.success) {
+                    const hours = Math.floor(dashData.today_study_time / 60);
+                    const minutes = dashData.today_study_time % 60;
+                    document.getElementById('today-study-time').textContent = `${hours}h ${minutes}m`;
+
+                    const progress = (dashData.today_study_time / dashData.study_goal) * 100;
+                    document.getElementById('study-progress').style.width = Math.min(progress, 100) + '%';
+                    document.getElementById('goal-text').textContent = `Goal: ${dashData.study_goal}m`;
+                }
+            } catch (error) {
+                console.error('Error loading study time:', error);
+            }
+
+            try {
+                const streakRes = await fetch('/api/streak');
+                const streakData = await streakRes.json();
+                if (streakData.success) {
+                    const { current, max } = streakData.streak;
+                    document.getElementById('streak-count').textContent = current;
+                    document.getElementById('streak-text').textContent =
+                        current > 0 ? `Best: ${max} day${max === 1 ? '' : 's'}` : 'Start a session to begin your streak';
+                }
+            } catch (error) {
+                console.error('Error loading streak:', error);
+            }
+
+            try {
+                const statsRes = await fetch('/api/statistics/weekly');
+                const statsData = await statsRes.json();
+                if (statsData.success && statsData.stats.length > 0) {
+                    drawWeeklyChart(statsData.stats);
+                }
+            } catch (error) {
+                console.error('Error loading weekly stats:', error);
+            }
+        }
+
+        function drawWeeklyChart(stats) {
+            const ctx = document.getElementById('weeklyChart').getContext('2d');
+            const labels = stats.map(s => new Date(s.date).toLocaleDateString('en-US', { weekday: 'short' }));
+            const data = stats.map(s => s.study_time);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Study Time (minutes)',
+                        data: data,
+                        backgroundColor: 'rgba(248, 168, 198, 0.7)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Minutes' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function openFocusTimer() {
+            document.getElementById('focusModal').style.display = 'flex';
+        }
+
+        function closeFocusTimer() {
+            document.getElementById('focusModal').style.display = 'none';
+        }
+
+        function startTimer() {
+            if (timerRunning) return;
+            timerRunning = true;
+            timerInterval = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+                if (timeRemaining === 0) {
+                    clearInterval(timerInterval);
+                    timerRunning = false;
+                    completeSession();
+                }
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerRunning = false;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            timeRemaining = 25 * 60;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(timeRemaining / 60);
+            const secs = timeRemaining % 60;
+            document.getElementById('timerDisplay').textContent =
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        async function completeSession() {
+            try {
+                await fetch('/api/sessions/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ duration: 25 })
+                });
+                alert('Great! Study session recorded! 🎉');
+                closeFocusTimer();
+                loadStudyActivity();
+            } catch (error) {
+                console.error('Error saving session:', error);
+            }
+        }
+
+        loadStudyActivity();
+    </script>
+    {% endif %}
 </body>
 </html>
