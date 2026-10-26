@@ -7,6 +7,9 @@ import psycopg2.extras
 from api_routes import api_bp
 from study_utils import StudySessionManager, StreakManager, StatisticsManager
 from datetime import date
+import uuid
+import requests
+from werkzeug.utils import secure_filename
 # Load environment variables from .env
 load_dotenv()
 
@@ -627,7 +630,101 @@ def get_channel_messages(channel_id):
     }
 
 
+@app.route("/group/<int:group_id>/files", methods=["GET", "POST"])
+def group_files(group_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
 
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cursor.execute(
+        "SELECT role FROM group_members WHERE user_id = %s AND group_id = %s",
+        (user["id"], group_id),
+    )
+    member = cursor.fetchone()
+    if not member:
+        cursor.close()
+        conn.close()
+        return redirect(url_for("community"))
+
+    cursor.execute("SELECT * FROM study_groups WHERE id = %s", (group_id,))
+    group = cursor.fetchone()
+    if not group:
+        cursor.close()
+        conn.close()
+        return redirect(url_for("community"))
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        uploaded_file = request.files.get("file")
+
+        if not title or not uploaded_file or uploaded_file.filename == "":
+            cursor.close()
+            conn.close()
+            return redirect(url_for("group_files", group_id=group_id))
+
+        original_name = secure_filename(uploaded_file.filename)
+        unique_name = f"{uuid.uuid4().hex}_{original_name}"
+        file_bytes = uploaded_file.read()
+        content_type = uploaded_file.content_type or "application/octet-stream"
+
+        supabase_url = os.getenv("SUPABASE_URL")
+        service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        bucket = os.getenv("SUPABASE_BUCKET", "shared-files")
+
+        upload_url = f"{supabase_url}/storage/v1/object/{bucket}/{unique_name}"
+        response = requests.post(
+            upload_url,
+            headers={
+                "Authorization": f"Bearer {service_role_key}",
+                "apikey": service_role_key,
+                "Content-Type": content_type,
+            },
+            data=file_bytes,
+        )
+
+        if response.status_code not in (200, 201):
+            cursor.close()
+            conn.close()
+            return f"Upload failed: {response.text}", 500
+
+        public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{unique_name}"
+
+        cursor.execute(
+            """
+            INSERT INTO shared_files
+                (user_id, group_id, title, description, file_name, storage_path, file_size, content_type)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user["id"], group_id, title, description, original_name, public_url,
+             len(file_bytes), content_type),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return redirect(url_for("group_files", group_id=group_id))
+
+    cursor.execute(
+        """
+        SELECT sf.id, sf.title, sf.description, sf.file_name, sf.storage_path,
+               sf.created_at, u.name AS uploaded_by
+        FROM shared_files sf
+        JOIN users u ON u.id = sf.user_id
+        WHERE sf.group_id = %s
+        ORDER BY sf.created_at DESC
+        """,
+        (group_id,),
+    )
+    files = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "group_files.html", user=user, group=group, files=files, user_role=member["role"]
+    )
 
 
 if __name__ == "__main__":

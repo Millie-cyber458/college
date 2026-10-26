@@ -50,6 +50,8 @@
                 <form action="{{ url_for('leave_group', group_id=group.id) }}" method="post">
     <button type="submit" class="btn btn-outline">Leave Group</button>
 </form>
+
+<a href="{{ url_for('group_files', group_id=group.id) }}" class="btn btn-outline">📂 Files</a>
             </div>
 
             <div class="group-channels">
