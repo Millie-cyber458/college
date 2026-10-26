@@ -74,7 +74,8 @@
             <div class="messages-container">
                 {% if messages %}
                     {% for message in messages %}
-                        <div class="message">
+                        <div class="message" data-id="{{ message.id }}">
+                            
                             {% if message.profile_picture %}
                                 <img src="{{ message.profile_picture }}" alt="{{ message.name }}" class="message-avatar">
                             {% else %}
@@ -134,13 +135,71 @@
         </aside>
     </div>
 
+
+
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <script>
-        // Auto-scroll to latest message
-        const messagesContainer = document.querySelector('.messages-container');
-        if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+<script>
+    const messagesContainer = document.querySelector('.messages-container');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    (function() {
+        if (!messagesContainer) return;
+
+        function getLastMessageId() {
+            const msgs = messagesContainer.querySelectorAll('.message[data-id]');
+            if (msgs.length === 0) return 0;
+            return Math.max(...Array.from(msgs).map(m => parseInt(m.dataset.id, 10)));
         }
-    </script>
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function pollMessages() {
+            try {
+                const res = await fetch('{{ url_for("get_channel_messages", channel_id=channel.id) }}');
+                const data = await res.json();
+                if (!data.success) return;
+
+                const lastId = getLastMessageId();
+                const newMessages = data.messages.filter(m => m.id > lastId);
+                if (newMessages.length === 0) return;
+
+                const emptyState = messagesContainer.querySelector('.messages-empty');
+                if (emptyState) emptyState.remove();
+
+                newMessages.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = 'message';
+                    div.dataset.id = m.id;
+                    div.innerHTML = `
+                        ${m.profile_picture
+                            ? `<img src="${m.profile_picture}" alt="${escapeHtml(m.name)}" class="message-avatar">`
+                            : `<div class="message-avatar">${escapeHtml(m.name[0])}</div>`}
+                        <div class="message-content">
+                            <div class="message-header">
+                                <strong>${escapeHtml(m.name)}</strong>
+                                <span class="message-time">${escapeHtml(m.created_at)}</span>
+                            </div>
+                            <p>${escapeHtml(m.content)}</p>
+                        </div>
+                    `;
+                    messagesContainer.appendChild(div);
+                });
+
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } catch (err) {
+                console.error('Error polling messages:', err);
+            }
+        }
+
+        setInterval(pollMessages, 8000);
+    })();
+</script>
+    
 </body>
 </html>

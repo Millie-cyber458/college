@@ -573,5 +573,62 @@ def leave_group(group_id):
     conn.close()
     return redirect(url_for("community"))
 
+@app.route("/api/channels/<int:channel_id>/messages")
+def get_channel_messages(channel_id):
+    user = get_current_user()
+    if not user:
+        return {"success": False, "error": "Not logged in"}, 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    cursor.execute("SELECT group_id FROM channels WHERE id = %s", (channel_id,))
+    channel_data = cursor.fetchone()
+    if not channel_data:
+        cursor.close()
+        conn.close()
+        return {"success": False, "error": "Channel not found"}, 404
+
+    cursor.execute(
+        "SELECT id FROM group_members WHERE user_id = %s AND group_id = %s",
+        (user["id"], channel_data["group_id"]),
+    )
+    if not cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return {"success": False, "error": "Not a member"}, 403
+
+    cursor.execute(
+        """
+        SELECT m.id, m.content, m.created_at, u.name, u.profile_picture
+        FROM messages m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.channel_id = %s
+        ORDER BY m.created_at ASC
+        """,
+        (channel_id,),
+    )
+    messages = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return {
+        "success": True,
+        "messages": [
+            {
+                "id": m["id"],
+                "name": m["name"],
+                "profile_picture": m["profile_picture"],
+                "content": m["content"],
+                "created_at": m["created_at"].strftime('%b %d, %I:%M %p'),
+            }
+            for m in messages
+        ],
+    }
+
+
+
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5001)
