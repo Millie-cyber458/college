@@ -552,5 +552,26 @@ def create_group():
     conn.close()
     return redirect(url_for("view_group", group_id=group_id))
 
+@app.route("/leave-group/<int:group_id>", methods=["POST"])
+def leave_group(group_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("community"))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM group_members WHERE user_id = %s AND group_id = %s",
+        (user["id"], group_id),
+    )
+    cursor.execute(
+        "UPDATE study_groups SET member_count = GREATEST(member_count - 1, 0) WHERE id = %s",
+        (group_id,),
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return redirect(url_for("community"))
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5001)

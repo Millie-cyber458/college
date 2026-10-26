@@ -46,6 +46,10 @@
                     </div>
                 </div>
                 <a href="{{ url_for('community') }}" class="btn btn-outline">Back to Groups</a>
+
+                <form action="{{ url_for('leave_group', group_id=group.id) }}" method="post">
+    <button type="submit" class="btn btn-outline">Leave Group</button>
+</form>
             </div>
 
             <div class="group-channels">
