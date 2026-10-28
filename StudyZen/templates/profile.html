@@ -134,7 +134,7 @@
             <div class="nav-menu">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}">Community</a>
-                {# <a href="{{ url_for('shared_files') }}">Shared Library</a> #}
+
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}" class="active">Profile</a>
 
@@ -232,8 +232,8 @@
                                 {% for group in joined_groups %}
                                     <li>
                                        <a href="{{ url_for('view_group', group_id=group.id) }}">{{ group.group_name }}</a>
-                    <span>({{ group.category }})</span> 
-                                     
+                    <span>({{ group.category }})</span>
+
                                 {% endfor %}
                             </ul>
                         {% else %}
@@ -258,15 +258,22 @@
                 <button onclick="pauseTimer()" class="timer-btn">Pause</button>
                 <button onclick="resetTimer()" class="timer-btn">Reset</button>
             </div>
+
             <div class="timer-options">
                 <label>
-                    <input type="radio" name="session-type" value="25" checked> 25 min Focus
+                    <input type="radio" name="session-type" value="25" data-type="focus" checked> 25 min Focus
                 </label>
                 <label>
-                    <input type="radio" name="session-type" value="5"> 5 min Break
+                    <input type="radio" name="session-type" value="5" data-type="break"> 5 min Break
                 </label>
                 <label>
-                    <input type="radio" name="session-type" value="15"> 15 min Long Break
+                    <input type="radio" name="session-type" value="15" data-type="break"> 15 min Long Break
+                </label>
+                <label>
+                    <input type="radio" name="session-type" value="custom" data-type="focus" id="customRadio">
+                    Custom:
+                    <input type="number" id="customMinutes" min="1" max="180" value="30" style="width: 60px;" disabled>
+                    min
                 </label>
             </div>
         </div>
@@ -284,7 +291,7 @@
             <div class="footer-links">
                 <a href="{{ url_for('index') }}">Home</a>
                 <a href="{{ url_for('community') }}">Community</a>
-               {# <a href="{{ url_for('shared_files') }}">Shared Library</a> #}
+
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
                 <a href="{{ url_for('about') }}">Guidelines</a>
@@ -305,6 +312,38 @@
         let timerInterval = null;
         let timeRemaining = 25 * 60;
         let timerRunning = false;
+
+        function getSelectedDuration() {
+            const selected = document.querySelector('input[name="session-type"]:checked');
+            if (!selected) return 25 * 60;
+
+            if (selected.value === 'custom') {
+                const customInput = document.getElementById('customMinutes');
+                let minutes = parseInt(customInput.value, 10);
+                if (isNaN(minutes) || minutes < 1) minutes = 1;
+                if (minutes > 180) minutes = 180;
+                return minutes * 60;
+            }
+
+            return parseInt(selected.value, 10) * 60;
+        }
+
+        document.querySelectorAll('input[name="session-type"]').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                document.getElementById('customMinutes').disabled = (radio.value !== 'custom');
+                pauseTimer();
+                timeRemaining = getSelectedDuration();
+                updateTimerDisplay();
+            });
+        });
+
+        document.getElementById('customMinutes').addEventListener('input', () => {
+            if (document.getElementById('customRadio').checked) {
+                pauseTimer();
+                timeRemaining = getSelectedDuration();
+                updateTimerDisplay();
+            }
+        });
 
         async function loadStudyActivity() {
             try {
@@ -407,7 +446,7 @@
         function resetTimer() {
             clearInterval(timerInterval);
             timerRunning = false;
-            timeRemaining = 25 * 60;
+            timeRemaining = getSelectedDuration();
             updateTimerDisplay();
         }
 
@@ -419,11 +458,21 @@
         }
 
         async function completeSession() {
+            const selected = document.querySelector('input[name="session-type"]:checked');
+            const type = selected ? selected.dataset.type : 'focus';
+            const minutes = Math.round(getSelectedDuration() / 60);
+
+            if (type === 'break') {
+                alert('Break complete! Ready to focus again? 🌸');
+                closeFocusTimer();
+                return;
+            }
+
             try {
                 await fetch('/api/sessions/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ duration: 25 })
+                    body: JSON.stringify({ duration: minutes })
                 });
                 alert('Great! Study session recorded! 🎉');
                 closeFocusTimer();

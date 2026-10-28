@@ -22,7 +22,7 @@ from functools import wraps
 
 import psycopg2
 from dotenv import load_dotenv
-from flask import Blueprint, jsonify, request, session, current_app
+from flask import Blueprint, g, jsonify, request, session, current_app
 from psycopg2.extras import RealDictCursor
 
 from study_utils import (
@@ -43,30 +43,33 @@ api_bp = Blueprint('api', __name__, url_prefix='/api')
 # =====================================================
 
 def get_db_connection():
-    """Create a PostgreSQL connection"""
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", "5432")),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", ""),
-        dbname=os.getenv("DB_NAME", "studyzen"),
-    )
-    conn.autocommit = True
-    return conn
+    """Reuse the same per-request connection app.py creates (shared via
+    flask.g), so an API call never opens a second connection on top of
+    whatever app.py's before_request hook already opened."""
+    if "db_conn" not in g:
+        conn = psycopg2.connect(
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", "5432")),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", ""),
+            dbname=os.getenv("DB_NAME", "studyzen"),
+        )
+        conn.autocommit = True
+        g.db_conn = conn
+    return g.db_conn
 
 
 @contextmanager
 def db_cursor(dict_rows=True):
-    """Open a cursor and always close the cursor and connection afterwards."""
+    """Open a cursor on the shared per-request connection. Only the
+    cursor is closed here — the connection itself is closed once, by
+    app.py's teardown_appcontext handler, after the whole request ends."""
     conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor) if dict_rows else conn.cursor()
     try:
-        cursor = conn.cursor(cursor_factory=RealDictCursor) if dict_rows else conn.cursor()
-        try:
-            yield cursor
-        finally:
-            cursor.close()
+        yield cursor
     finally:
-        conn.close()
+        cursor.close()
 
 
 def api_login_required(view):
@@ -94,6 +97,7 @@ def is_group_member(cursor, user_id, group_id):
 def server_error(exc):
     current_app.logger.exception("API error: %s", exc)
     return jsonify({'error': 'Something went wrong'}), 500
+
 
 
 # =====================================================

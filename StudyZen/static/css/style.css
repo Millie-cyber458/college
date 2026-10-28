@@ -163,17 +163,14 @@ button {
 }
 
 .hero-section {
-    padding: 80px 0 60px;
-    background: 
+    padding: 40px 0 60px;
+    background:
         radial-gradient(circle at top left, rgba(248, 200, 220, 0.32), transparent 30%),
-        linear-gradient(180deg, #fff7fa 0%, #fffdfd 100%),
-        url('../images/retro-landscape-blue-3d-vector-background-futuristic-technology-mountain-landscape-80s-city-neon_508524-446.avif') center/cover no-repeat;
-    background-attachment: fixed;
+        linear-gradient(180deg, #fff7fa 0%, #fffdfd 100%);
 }
-
 .hero-grid {
     display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
+    grid-template-columns: 1fr;
     gap: 34px;
     align-items: center;
 }
@@ -190,8 +187,7 @@ button {
 
 .hero-content h1,
 .page-heading h1,
-.about-copy h1,
-.section-heading h2 {
+.about-copy h1 {
     font-size: clamp(2.4rem, 5vw, 4.2rem);
     line-height: 1.08;
     margin: 0 0 20px;
@@ -219,6 +215,7 @@ button {
     display: flex;
     gap: 18px;
     flex-wrap: wrap;
+    flex-start: flex-start;
 }
 
 .stat-box {
@@ -358,7 +355,7 @@ button {
 
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 24px;
 }
 
@@ -369,11 +366,18 @@ button {
     padding: 30px 24px;
     box-shadow: 0 15px 30px rgba(58, 38, 48, 0.05);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .feature-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 18px 35px rgba(217, 79, 131, 0.12);
+}
+
+.feature-card .inline-link {
+    margin-top: auto;
+    padding-top: 16px;
 }
 
 .feature-icon {
@@ -401,6 +405,7 @@ button {
 
 .guideline-card {
     background: linear-gradient(180deg, #fff9fb 0%, #fff3f8 100%);
+    grid-column: 1 / -1;
 }
 
 .guideline-list {
@@ -856,6 +861,25 @@ button {
         font-size: 2.3rem;
     }
 
+    .section-heading {
+    max-width: 640px;
+    margin: 0 auto 20px;
+    text-align: center;
+}
+ .section-heading .eyebrow {
+    margin: 0 0 6px;
+} 
+.section-heading h2 {
+    font-size: clamp(2rem, 3.5vw, 2.8rem);
+    margin: 0;
+}
+
+    .hero-content {
+        max-width: 700px;
+        margin: 0 auto;
+        text-align: center;
+    }
+
     .hero-actions {
         flex-direction: column;
     }
@@ -1014,4 +1038,3 @@ button {
         grid-template-columns: 1fr;
     }
 }
-

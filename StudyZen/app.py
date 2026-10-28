@@ -1,5 +1,5 @@
 import os
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, g, redirect, render_template, request, session, url_for
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 import psycopg2
@@ -18,21 +18,34 @@ load_dotenv()
 os.environ.setdefault("AUTHLIB_INSECURE_TRANSPORT", "1")
 
 
-def get_db_connection():
-    """Create a PostgreSQL connection using values from the .env file."""
-    return psycopg2.connect(
+def _create_db_connection():
+    """Open a brand new PostgreSQL connection (autocommit, so every
+    statement is committed immediately without needing conn.commit())."""
+    conn = psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
         user=os.getenv("DB_USER", "postgres"),
         password=os.getenv("DB_PASSWORD", ""),
         dbname=os.getenv("DB_NAME", "studyzen"),
     )
+    conn.autocommit = True
+    return conn
+
+
+def get_db_connection():
+    """Reuse ONE PostgreSQL connection per request, cached on flask.g,
+    instead of opening a new network connection every time this is called."""
+    if "db_conn" not in g:
+        g.db_conn = _create_db_connection()
+    return g.db_conn
 
 
 def initialize_database():
-    """Initialize database tables for Discord-like features."""
+    """Initialize database tables for Discord-like features.
+    Runs once at startup, outside any request, so it uses its own
+    standalone connection rather than the per-request cached one."""
     try:
-        conn = get_db_connection()
+        conn = _create_db_connection()
         cursor = conn.cursor()
 
         # Create channels table if it doesn't exist
@@ -67,7 +80,6 @@ def initialize_database():
         """)
 
         # Insert default channels for existing groups if they don't exist
-        # Requires a UNIQUE constraint on (group_id, channel_name) for ON CONFLICT to work.
         cursor.execute("""
             INSERT INTO channels (group_id, channel_name, description) VALUES
             (1, 'general', 'General discussion for software development'),
@@ -85,7 +97,6 @@ def initialize_database():
             ON CONFLICT (group_id, channel_name) DO NOTHING
         """)
 
-        conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
@@ -94,6 +105,15 @@ def initialize_database():
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace-with-a-secure-secret")
+
+
+@app.teardown_appcontext
+def close_db_connection(exception=None):
+    """Close the request's shared connection exactly once, when the
+    request is fully done (whether it succeeded or raised an error)."""
+    db_conn = g.pop("db_conn", None)
+    if db_conn is not None:
+        db_conn.close()
 
 
 oauth = OAuth(app)
@@ -126,10 +146,8 @@ def update_daily_streak():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         StreakManager.update_login_streak(cursor, user_id)
-        conn.commit()
     finally:
         cursor.close()
-        conn.close()
     session["streak_counted_date"] = str(date.today())
 
 
@@ -144,7 +162,6 @@ def get_current_user():
     cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     user = cursor.fetchone()
     cursor.close()
-    conn.close()
     return user
 
 
@@ -172,7 +189,6 @@ def create_or_get_user(user_info):
             """,
             (google_id, name, email, profile_picture),
         )
-        conn.commit()
         cursor.execute(
             "SELECT * FROM users WHERE google_id = %s OR email = %s LIMIT 1",
             (google_id, email),
@@ -180,7 +196,6 @@ def create_or_get_user(user_info):
         user = cursor.fetchone()
 
     cursor.close()
-    conn.close()
     return user
 
 
@@ -194,13 +209,36 @@ def get_joined_group_ids(user_id):
     )
     joined = {row[0] for row in cursor.fetchall()}
     cursor.close()
-    conn.close()
     return joined
-
 
 @app.route("/")
 def index():
-    return render_template("index.html", user=get_current_user())
+    user = get_current_user()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    student_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM study_groups")
+    group_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM shared_files")
+    file_count = cursor.fetchone()[0]
+
+    cursor.close()
+
+    return render_template(
+        'index.html',
+        user=user,
+        student_count=student_count,
+        group_count=group_count,
+        file_count=file_count
+    )
+
+
+
+
 
 
 
@@ -215,7 +253,6 @@ def community():
     cursor.execute("SELECT * FROM study_groups ORDER BY id ASC")
     groups = cursor.fetchall()
     cursor.close()
-    conn.close()
 
     joined_group_ids = get_joined_group_ids(user["id"])
     return render_template(
@@ -258,7 +295,6 @@ def profile():
     )
     total_groups = cursor.fetchone()["total"]
     cursor.close()
-    conn.close()
 
     return render_template(
         "profile.html",
@@ -306,16 +342,13 @@ def view_group(group_id):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Get group info
     cursor.execute("SELECT * FROM study_groups WHERE id = %s", (group_id,))
     group = cursor.fetchone()
 
     if not group:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
-    # Check if user is a member
     cursor.execute(
         "SELECT role FROM group_members WHERE user_id = %s AND group_id = %s",
         (user["id"], group_id),
@@ -324,17 +357,14 @@ def view_group(group_id):
 
     if not member:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
-    # Get all channels for this group
     cursor.execute(
         "SELECT * FROM channels WHERE group_id = %s ORDER BY created_at ASC",
         (group_id,),
     )
     channels = cursor.fetchall()
 
-    # Get members count
     cursor.execute(
         "SELECT COUNT(*) as count FROM group_members WHERE group_id = %s",
         (group_id,),
@@ -342,7 +372,6 @@ def view_group(group_id):
     member_count = cursor.fetchone()["count"]
 
     cursor.close()
-    conn.close()
 
     return render_template(
         "group.html",
@@ -364,7 +393,6 @@ def view_channel(channel_id):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Get channel and group info
     cursor.execute(
         """
         SELECT c.*, sg.id as group_id, sg.group_name
@@ -378,10 +406,8 @@ def view_channel(channel_id):
 
     if not channel:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
-    # Check if user is a member of the group
     cursor.execute(
         "SELECT role FROM group_members WHERE user_id = %s AND group_id = %s",
         (user["id"], channel["group_id"]),
@@ -390,10 +416,8 @@ def view_channel(channel_id):
 
     if not member:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
-    # Get all messages in this channel
     cursor.execute(
         """
         SELECT m.id, m.content, m.created_at, u.name, u.profile_picture
@@ -406,14 +430,12 @@ def view_channel(channel_id):
     )
     messages = cursor.fetchall()
 
-    # Get all channels for the sidebar
     cursor.execute(
         "SELECT * FROM channels WHERE group_id = %s ORDER BY created_at ASC",
         (channel["group_id"],),
     )
     channels = cursor.fetchall()
 
-    # Get group members
     cursor.execute(
         """
         SELECT u.id, u.name, u.profile_picture, gm.role
@@ -427,7 +449,6 @@ def view_channel(channel_id):
     members = cursor.fetchall()
 
     cursor.close()
-    conn.close()
 
     return render_template(
         "channel.html",
@@ -454,7 +475,6 @@ def post_message(channel_id):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Verify user is in the channel's group
     cursor.execute(
         """
         SELECT c.group_id FROM channels c WHERE c.id = %s
@@ -465,7 +485,6 @@ def post_message(channel_id):
 
     if not channel_data:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
     cursor.execute(
@@ -474,17 +493,13 @@ def post_message(channel_id):
     )
     if not cursor.fetchone():
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
-    # Insert message
     cursor.execute(
         "INSERT INTO messages (channel_id, user_id, content, created_at) VALUES (%s, %s, %s, NOW())",
         (channel_id, user["id"], content),
     )
-    conn.commit()
     cursor.close()
-    conn.close()
 
     return redirect(url_for("view_channel", channel_id=channel_id))
 
@@ -513,10 +528,8 @@ def join_group(group_id):
             "UPDATE study_groups SET member_count = member_count + 1 WHERE id = %s",
             (group_id,),
         )
-        conn.commit()
 
     cursor.close()
-    conn.close()
     return redirect(url_for("view_group", group_id=group_id))
 
 @app.route("/create-group", methods=["POST"])
@@ -550,9 +563,7 @@ def create_group():
         "INSERT INTO channels (group_id, channel_name, description) VALUES (%s, 'general', 'General discussion')",
         (group_id,),
     )
-    conn.commit()
     cursor.close()
-    conn.close()
     return redirect(url_for("view_group", group_id=group_id))
 
 @app.route("/leave-group/<int:group_id>", methods=["POST"])
@@ -571,9 +582,7 @@ def leave_group(group_id):
         "UPDATE study_groups SET member_count = GREATEST(member_count - 1, 0) WHERE id = %s",
         (group_id,),
     )
-    conn.commit()
     cursor.close()
-    conn.close()
     return redirect(url_for("community"))
 
 @app.route("/api/channels/<int:channel_id>/messages")
@@ -589,7 +598,6 @@ def get_channel_messages(channel_id):
     channel_data = cursor.fetchone()
     if not channel_data:
         cursor.close()
-        conn.close()
         return {"success": False, "error": "Channel not found"}, 404
 
     cursor.execute(
@@ -598,7 +606,6 @@ def get_channel_messages(channel_id):
     )
     if not cursor.fetchone():
         cursor.close()
-        conn.close()
         return {"success": False, "error": "Not a member"}, 403
 
     cursor.execute(
@@ -613,7 +620,6 @@ def get_channel_messages(channel_id):
     )
     messages = cursor.fetchall()
     cursor.close()
-    conn.close()
 
     return {
         "success": True,
@@ -646,14 +652,12 @@ def group_files(group_id):
     member = cursor.fetchone()
     if not member:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
     cursor.execute("SELECT * FROM study_groups WHERE id = %s", (group_id,))
     group = cursor.fetchone()
     if not group:
         cursor.close()
-        conn.close()
         return redirect(url_for("community"))
 
     if request.method == "POST":
@@ -663,7 +667,6 @@ def group_files(group_id):
 
         if not title or not uploaded_file or uploaded_file.filename == "":
             cursor.close()
-            conn.close()
             return redirect(url_for("group_files", group_id=group_id))
 
         original_name = secure_filename(uploaded_file.filename)
@@ -688,7 +691,6 @@ def group_files(group_id):
 
         if response.status_code not in (200, 201):
             cursor.close()
-            conn.close()
             return f"Upload failed: {response.text}", 500
 
         public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{unique_name}"
@@ -702,9 +704,9 @@ def group_files(group_id):
             (user["id"], group_id, title, description, original_name, public_url,
              len(file_bytes), content_type),
         )
-        conn.commit()
+
         cursor.close()
-        conn.close()
+
         return redirect(url_for("group_files", group_id=group_id))
 
     cursor.execute(
@@ -720,7 +722,6 @@ def group_files(group_id):
     )
     files = cursor.fetchall()
     cursor.close()
-    conn.close()
 
     return render_template(
         "group_files.html", user=user, group=group, files=files, user_role=member["role"]
