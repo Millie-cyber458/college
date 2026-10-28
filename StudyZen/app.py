@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 import psycopg2
 import psycopg2.extras
 from api_routes import api_bp
-from study_utils import StudySessionManager, StreakManager, StatisticsManager
-from datetime import date
 import uuid
 import requests
 from werkzeug.utils import secure_filename
@@ -40,69 +38,6 @@ def get_db_connection():
     return g.db_conn
 
 
-def initialize_database():
-    """Initialize database tables for Discord-like features.
-    Runs once at startup, outside any request, so it uses its own
-    standalone connection rather than the per-request cached one."""
-    try:
-        conn = _create_db_connection()
-        cursor = conn.cursor()
-
-        # Create channels table if it doesn't exist
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS channels (
-                id SERIAL PRIMARY KEY,
-                group_id INT NOT NULL,
-                channel_name VARCHAR(255) NOT NULL,
-                description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (group_id) REFERENCES study_groups(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Create messages table if it doesn't exist
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id SERIAL PRIMARY KEY,
-                channel_id INT NOT NULL,
-                user_id INT NOT NULL,
-                content TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Add role column to group_members if it doesn't exist
-        cursor.execute("""
-            ALTER TABLE group_members
-            ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'member'
-        """)
-
-        # Insert default channels for existing groups if they don't exist
-        cursor.execute("""
-            INSERT INTO channels (group_id, channel_name, description) VALUES
-            (1, 'general', 'General discussion for software development'),
-            (1, 'projects', 'Share and review programming projects'),
-            (1, 'resources', 'Useful tutorials, documentation and tools'),
-            (2, 'general', 'Math homework and concept discussions'),
-            (2, 'problems', 'Problem solving and exercises'),
-            (3, 'general', 'Science discussions and experiments'),
-            (3, 'research', 'Share research papers and findings'),
-            (4, 'general', 'Geography discussions and map sharing'),
-            (5, 'general', 'English literature and writing discussions'),
-            (5, 'writing', 'Share your writing and get feedback'),
-            (6, 'general', 'Creative ideas and inspiration sharing'),
-            (6, 'artwork', 'Share and critique artwork and designs')
-            ON CONFLICT (group_id, channel_name) DO NOTHING
-        """)
-
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Database initialization: {str(e)}")
-
-
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "replace-with-a-secure-secret")
 
@@ -128,27 +63,6 @@ oauth.register(
 
 # Register API Blueprint
 app.register_blueprint(api_bp)
-
-# Initialize database tables
-initialize_database()
-
-
-@app.before_request
-def update_daily_streak():
-    """Give every logged-in visit today credit toward the user's streak."""
-    user_id = session.get("user_id")
-    if not user_id:
-        return
-    if session.get("streak_counted_date") == str(date.today()):
-        return  # already counted today, skip the DB hit
-
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    try:
-        StreakManager.update_login_streak(cursor, user_id)
-    finally:
-        cursor.close()
-    session["streak_counted_date"] = str(date.today())
 
 
 def get_current_user():
@@ -235,11 +149,6 @@ def index():
         group_count=group_count,
         file_count=file_count
     )
-
-
-
-
-
 
 
 @app.route("/community")

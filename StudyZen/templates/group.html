@@ -25,11 +25,7 @@
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
 
-                {% if user %}
-                    <a href="{{ url_for('profile') }}" class="user-pill">{{ user.name }}</a>
-                {% else %}
-                    <button type="button" class="btn btn-primary btn-small login-open-btn">Login with Google</button>
-                {% endif %}
+                <a href="{{ url_for('profile') }}" class="user-pill">{{ user.name }}</a>
             </div>
         </nav>
     </header>
@@ -90,6 +86,7 @@
                 <a href="{{ url_for('community') }}">Community</a>
                 <a href="{{ url_for('about') }}">About</a>
                 <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('about') }}">Guidelines</a>
             </div>
             <div class="socials">
                 <span>💗</span>

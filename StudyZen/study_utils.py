@@ -9,7 +9,7 @@ All functions expect a psycopg2 RealDictCursor (dict-style row access),
 since that's what api_routes.py passes in everywhere.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 
 class StudySessionManager:
@@ -19,10 +19,8 @@ class StudySessionManager:
     def create_session(cursor, user_id, group_id, subject_id, task_id,
                         duration_minutes, planned_duration, session_type='focus'):
         """Create a new study session. Returns the new session's id."""
-        now = date.today()
-        from datetime import datetime, timedelta as _td
         started_at = datetime.now()
-        ended_at = started_at + _td(minutes=duration_minutes)
+        ended_at = started_at + timedelta(minutes=duration_minutes)
 
         cursor.execute("""
             INSERT INTO study_sessions
