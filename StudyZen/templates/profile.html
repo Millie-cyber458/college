@@ -180,7 +180,8 @@
                         <img src="{{ user.profile_picture or 'https://ui-avatars.com/api/?name=' + user.name + '&background=F8C8DC&color=3A2630' }}" alt="Profile picture" class="profile-avatar">
                         <div>
                             <h1>{{ user.name }}</h1>
-                            <p>{{ user.email }}</p>
+                            {#<p>{{ user.email }}</p>#}
+                            <p>Member since {{ user.created_at.strftime('%b %Y') if user.created_at else 'today' }}</p>
                         </div>
                     </div>
 
