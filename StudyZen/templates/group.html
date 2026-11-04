@@ -41,14 +41,15 @@
                         <span class="group-stats">{{ member_count }} members</span>
                     </div>
                 </div>
+               
                 <a href="{{ url_for('community') }}" class="btn btn-outline">Back to Groups</a>
-
+ <a href="{{ url_for('group_files', group_id=group.id) }}" class="btn btn-outline">📂 Files</a>
                 <form method="POST" action="{{ url_for('leave_group', group_id=group.id) }}"
                       data-confirm="Are you sure you want to leave this group?">
-                    <button type="submit" class="btn btn-outline">Leave Group</button>
+                    <button type="submit" class="btn btn-danger">Leave Group</button>
                 </form>
 
-<a href="{{ url_for('group_files', group_id=group.id) }}" class="btn btn-outline">📂 Files</a>
+
             </div>
 
             <div class="group-channels">

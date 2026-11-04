@@ -155,6 +155,21 @@ button {
     cursor: default;
 }
 
+.btn-danger,
+.group-header .btn-danger {
+    color: #B3123F;
+    border-color: rgba(179, 18, 63, 0.45);
+    background: rgba(179, 18, 63, 0.06);
+}
+
+.btn-danger:hover,
+.group-header .btn-danger:hover {
+    background: #B3123F;
+    color: var(--white);
+    border-color: #B3123F;
+    box-shadow: 0 12px 24px rgba(179, 18, 63, 0.22);
+}
+
 .user-pill {
     background: var(--light-pink);
     border-radius: 999px;
@@ -215,7 +230,7 @@ button {
     display: flex;
     gap: 18px;
     flex-wrap: wrap;
-    flex-start: flex-start;
+    flex-basis: flex-start;
 }
 
 .stat-box {
