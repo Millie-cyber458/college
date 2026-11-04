@@ -483,15 +483,20 @@ def leave_group(group_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    
     cursor.execute(
         "DELETE FROM group_members WHERE user_id = %s AND group_id = %s",
         (user["id"], group_id),
     )
-    cursor.execute(
-        "UPDATE study_groups SET member_count = GREATEST(member_count - 1, 0) WHERE id = %s",
-        (group_id,),
-    )
+    if cursor.rowcount > 0:
+        cursor.execute(
+            "UPDATE study_groups SET member_count = GREATEST(member_count - 1, 0) WHERE id = %s",
+            (group_id,),
+        )
     cursor.close()
+
+
     return redirect(url_for("community"))
 
 @app.route("/api/channels/<int:channel_id>/messages")
