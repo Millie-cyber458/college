@@ -66,10 +66,16 @@
                     {% endif %}
                 </div>
                 <div class="channel-actions">
-                    <button class="btn-icon" title="Channel info">ℹ️</button>
+                    <button type="button" class="btn-icon" id="channelInfoBtn"
+
+                    title="Channel info" aria-expanded="false">ℹ️</button>
                 </div>
             </div>
-
+         <div class="channel-info-panel hidden" id="channelInfoPanel">
+                <strong>{{ channel.group_name }}</strong>
+                <p>{{ channel.group_description or "No description available yet." }}</p>
+                 <small>{{ channel.channel_name }} · {{ members|length }} members</small>
+            </div>
             <!-- Messages Area -->
             <div class="messages-container">
                 {% if messages %}
@@ -198,6 +204,16 @@
         }
 
         setInterval(pollMessages, 8000);
+
+        // Channel info panel
+        const infoBtn = document.getElementById('channelInfoBtn');
+        const infoPanel = document.getElementById('channelInfoPanel');
+        if (infoBtn && infoPanel) {
+            infoBtn.addEventListener('click', () => {
+                const open = infoPanel.classList.toggle('hidden') === false;
+                infoBtn.setAttribute('aria-expanded', open);
+            });
+        }
     })();
 </script>
     

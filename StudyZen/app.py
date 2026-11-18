@@ -8,6 +8,7 @@ from api_routes import api_bp
 import uuid
 import requests
 from werkzeug.utils import secure_filename
+from authlib.integrations.base_client.errors import OAuthError
 # Load environment variables from .env
 load_dotenv()
 
@@ -96,18 +97,15 @@ def create_or_get_user(user_info):
     user = cursor.fetchone()
 
     if user is None:
-        cursor.execute(
+       cursor.execute(
             """
             INSERT INTO users (google_id, name, email, profile_picture, created_at)
             VALUES (%s, %s, %s, %s, NOW())
+            RETURNING *
             """,
             (google_id, name, email, profile_picture),
         )
-        cursor.execute(
-            "SELECT * FROM users WHERE google_id = %s OR email = %s LIMIT 1",
-            (google_id, email),
-        )
-        user = cursor.fetchone()
+       user = cursor.fetchone()
 
     cursor.close()
     return user
@@ -222,18 +220,24 @@ def login():
 
 @app.route("/auth/google/callback")
 def auth_google_callback():
-    token = oauth.google.authorize_access_token()
-    user_info = oauth.google.userinfo()
+    # User pressed Cancel on Google's screen, or Google reported an error
+    if request.args.get("error"):
+        return redirect(url_for("index"))
+
+    try:
+        oauth.google.authorize_access_token()
+        user_info = oauth.google.userinfo()
+    except OAuthError:
+        # Expired or invalid login attempt: send them back instead of an error page
+        return redirect(url_for("index"))
+
     user = create_or_get_user(user_info)
 
     if user is None:
         return redirect(url_for("index"))
 
     session["user_id"] = user["id"]
-    session["user_name"] = user["name"]
-    session["user_email"] = user["email"]
     return redirect(url_for("community"))
-
 
 @app.route("/logout")
 def logout():
@@ -304,7 +308,8 @@ def view_channel(channel_id):
 
     cursor.execute(
         """
-        SELECT c.*, sg.id as group_id, sg.group_name
+        SELECT c.*, sg.id as group_id, sg.group_name,
+               sg.description AS group_description
         FROM channels c
         JOIN study_groups sg ON c.group_id = sg.id
         WHERE c.id = %s
@@ -483,8 +488,7 @@ def leave_group(group_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    
+
     cursor.execute(
         "DELETE FROM group_members WHERE user_id = %s AND group_id = %s",
         (user["id"], group_id),
@@ -497,6 +501,27 @@ def leave_group(group_id):
     cursor.close()
 
 
+    return redirect(url_for("community"))
+
+@app.route("/delete-group/<int:group_id>", methods=["POST"])
+def delete_group(group_id):
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT role FROM group_members WHERE user_id = %s AND group_id = %s",
+        (user["id"], group_id),
+    )
+    row = cursor.fetchone()
+    if not row or row[0] != "admin":
+        cursor.close()
+        return redirect(url_for("view_group", group_id=group_id))
+
+    cursor.execute("DELETE FROM study_groups WHERE id = %s", (group_id,))
+    cursor.close()
     return redirect(url_for("community"))
 
 @app.route("/api/channels/<int:channel_id>/messages")

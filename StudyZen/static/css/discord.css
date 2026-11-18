@@ -208,6 +208,17 @@
     font-size: 0.9rem;
 }
 
+.channel-info-panel {
+    padding: 0.9rem 1.5rem;
+    background: #2b2d31;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid var(--dark-pink, #D94F83);
+    color: #dbdee1;
+}
+.channel-info-panel strong { color: #ffffff; }
+.channel-info-panel p { margin: 0.3rem 0; color: #b5bac1; }
+.channel-info-panel small { color: #949ba4; }
+.channel-info-panel.hidden { display: none; }
 .channel-actions {
     display: flex;
     gap: 12px;
