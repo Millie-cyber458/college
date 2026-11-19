@@ -32,9 +32,9 @@ load_dotenv()
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 
-# =====================================================
+
 # HELPERS
-# =====================================================
+
 
 def get_db_connection():
     """Create a PostgreSQL connection"""
@@ -90,9 +90,8 @@ def server_error(exc):
     return jsonify({'error': 'Something went wrong'}), 500
 
 
-# =====================================================
+
 # DASHBOARD ROUTE (used by the profile page)
-# =====================================================
 
 @api_bp.route('/dashboard', methods=['GET'])
 @api_login_required
@@ -121,9 +120,9 @@ def get_dashboard():
         return server_error(e)
 
 
-# =====================================================
+
 # FOCUS TIMER ROUTES
-# =====================================================
+
 
 @api_bp.route('/sessions/start', methods=['POST'])
 @api_login_required
@@ -143,8 +142,7 @@ def start_study_session():
         return jsonify({'error': 'duration must be between 1 and 240 minutes'}), 400
 
     try:
-        # CHANGED: dict_rows=False -> default (dict cursor), since
-        # StudySessionManager.create_session reads cursor.fetchone()['id']
+        
         with db_cursor() as cursor:
             if group_id and not is_group_member(cursor, user_id, group_id):
                 return jsonify({'error': 'not a member of this group'}), 403
@@ -155,9 +153,6 @@ def start_study_session():
             )
 
             StreakManager.update_streak(cursor, user_id, group_id)
-            # ADDED: without this, daily_statistics never gets populated,
-            # so the dashboard's streak/tasks-completed cards and weekly
-            # chart would always show empty data.
             StatisticsManager.update_daily_stats(cursor, user_id, group_id)
 
         return jsonify({'success': True, 'session_id': session_id}), 201
@@ -165,10 +160,7 @@ def start_study_session():
     except Exception as e:
         return server_error(e)
 
-
-# =====================================================
 # STATISTICS ROUTES
-# =====================================================
 
 @api_bp.route('/statistics/weekly', methods=['GET'])
 @api_login_required
@@ -186,9 +178,7 @@ def get_weekly_statistics():
         return server_error(e)
 
 
-# =====================================================
 # STREAK ROUTES
-# =====================================================
 
 @api_bp.route('/streak', methods=['GET'])
 @api_login_required
